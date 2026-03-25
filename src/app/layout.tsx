@@ -10,6 +10,7 @@ const comicNeue = Comic_Neue({
 
 import { AlertProvider } from "@/lib/AlertContext";
 import { AuthProvider } from "@/lib/AuthContext";
+import { SessionProvider } from "@/components/SessionProvider";
 
 export const metadata: Metadata = {
   title: "IA Tutor - Apoyo a la Lectoescritura",
@@ -26,7 +27,9 @@ export default function RootLayout({
       <body className="font-sans min-h-full flex flex-col bg-slate-50">
         <AlertProvider>
           <AuthProvider>
-            {children}
+            <SessionProvider>
+              {children}
+            </SessionProvider>
           </AuthProvider>
         </AlertProvider>
       </body>
