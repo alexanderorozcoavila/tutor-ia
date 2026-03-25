@@ -8,13 +8,13 @@ const comicNeue = Comic_Neue({
   variable: "--font-comic-neue",
 });
 
+import { AlertProvider } from "@/lib/AlertContext";
+import { AuthProvider } from "@/lib/AuthContext";
+
 export const metadata: Metadata = {
   title: "IA Tutor - Apoyo a la Lectoescritura",
   description: "Tutor virtual interactivo diseñado para niños con TDA o TEA Nivel 1.",
 };
-
-import { SessionProvider } from "@/components/SessionProvider";
-import { Navbar } from "@/components/Navbar";
 
 export default function RootLayout({
   children,
@@ -23,11 +23,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className={`${comicNeue.variable} h-full antialiased`}>
-      <body className="font-sans min-h-full flex flex-col bg-slate-50 pt-16">
-        <SessionProvider>
-          <Navbar />
-          {children}
-        </SessionProvider>
+      <body className="font-sans min-h-full flex flex-col bg-slate-50">
+        <AlertProvider>
+          <AuthProvider>
+            {children}
+          </AuthProvider>
+        </AlertProvider>
       </body>
     </html>
   );

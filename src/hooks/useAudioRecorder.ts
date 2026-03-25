@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
+import { useAlert } from "@/lib/AlertContext";
 
 export function useAudioRecorder() {
+  const { showAlert } = useAlert();
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   
@@ -39,9 +41,9 @@ export function useAudioRecorder() {
     } catch (error) {
       console.error("Error al acceder al micrófono:", error);
       setIsRecording(false);
-      alert("Por favor habilita el acceso al micrófono para que el tutor te escuche.");
+      showAlert("Por favor habilita el acceso al micrófono para que el tutor te escuche.", { type: "info" });
     }
-  }, []);
+  }, [showAlert]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {

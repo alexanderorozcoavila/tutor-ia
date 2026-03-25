@@ -3,12 +3,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTTS } from "@/hooks/useTTS";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import { taskService } from "@/lib/taskService";
+import { settingsService } from "@/lib/settingsService";
 import { ImageCapture } from "@/components/ImageCapture";
 import { 
   Loader2, BookOpen, PenTool, ArrowRight, 
   CheckCircle2, Timer, RefreshCcw, Settings, 
   Play, StopCircle, BellRing, AlertTriangle 
 } from "lucide-react";
+import { useAlert } from "@/lib/AlertContext";
 
 type Mode = "LIBRE" | "TEMPORIZADOR";
 
@@ -17,11 +20,22 @@ interface Config {
   timeLimit: number; // segundos por frase
   alertInterval: number; // segundos para alerta de atención
   enableAlerts: boolean;
+  hideText?: boolean;
 }
 
-export function DictationModule() {
-  const [step, setStep] = useState<"INPUT" | "PROCESSING" | "CONFIG" | "DICTATING" | "EVALUATING" | "FINISHED">("INPUT");
-  const [inputText, setInputText] = useState("");
+interface Props {
+  taskId?: string;
+  initialText?: string;
+  initialConfig?: Config;
+  onFinish?: () => void;
+}
+
+export function DictationModule({ taskId, initialText, initialConfig, onFinish }: Props) {
+  const { showAlert: globalAlert } = useAlert();
+  const [step, setStep] = useState<"INPUT" | "PROCESSING" | "CONFIG" | "DICTATING" | "CAPTURING_EVIDENCE" | "FINISHED">(
+    initialText ? (initialConfig ? "DICTATING" : "CONFIG") : "INPUT"
+  );
+  const [inputText, setInputText] = useState(initialText || "");
   const [phrases, setPhrases] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timer, setTimer] = useState(0);
@@ -29,12 +43,15 @@ export function DictationModule() {
   const [showAlert, setShowAlert] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [evaluationFeedback, setEvaluationFeedback] = useState<{ success: boolean; message: string; detected_word?: string } | null>(null);
+  const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
+  const [attentionMessage, setAttentionMessage] = useState("¡Hola! ¿Cómo vas? Sigamos juntos.");
   
-  const [config, setConfig] = useState<Config>({
+  const [config, setConfig] = useState<Config>(initialConfig || {
     mode: "LIBRE",
     timeLimit: 30,
     alertInterval: 10,
     enableAlerts: true,
+    hideText: false,
   });
 
   const { speak, isSpeaking, stop: stopTTS } = useTTS();
@@ -65,8 +82,24 @@ export function DictationModule() {
     });
 
     setPhrases(finalPhrases);
-    setStep("CONFIG");
+    setStep(initialConfig ? "DICTATING" : "CONFIG");
   };
+
+  useEffect(() => {
+    const loadGlobalSettings = async () => {
+      const settings = await settingsService.getSettings();
+      if (settings.attention_message) {
+        setAttentionMessage(settings.attention_message);
+      }
+    };
+    loadGlobalSettings();
+  }, []);
+
+  useEffect(() => {
+    if (initialText) {
+      processPhrases(initialText);
+    }
+  }, [initialText]);
 
   const handleImageReady = async (base64: string) => {
     setIsProcessing(true);
@@ -82,7 +115,7 @@ export function DictationModule() {
       processPhrases(text);
     } catch (err) {
       console.error(err);
-      alert("No pude leer bien la imagen. ¿Podrías intentar de nuevo o escribir el texto?");
+      globalAlert("No pude leer bien la imagen. ¿Podrías intentar de nuevo o escribir el texto?", { type: "error" });
       setStep("INPUT");
     } finally {
       setIsProcessing(false);
@@ -90,6 +123,8 @@ export function DictationModule() {
   };
 
   const startDictation = () => {
+    // Desbloquear audio con una interacción de usuario (algunos navegadores lo requieren)
+    speak(""); 
     setStep("DICTATING");
     setCurrentIndex(0);
     setTimer(0);
@@ -104,15 +139,14 @@ export function DictationModule() {
         setTimer((prev) => {
           const nextVal = prev + 1;
           
-          // Alerta de atención cada alertInterval segundos
-          if (config.enableAlerts && nextVal % config.alertInterval === 0) {
+          // Marcar alerta de atención para mostrar el visual
+          if (config.enableAlerts && config.alertInterval > 0 && nextVal % config.alertInterval === 0) {
             setShowAlert(true);
-            speak("¡Hola! ¿Cómo vas? Sigamos juntos.");
             setTimeout(() => setShowAlert(false), 3000);
           }
 
-          // Límite de tiempo en modo temporizador
-          if (config.mode === "TEMPORIZADOR" && nextVal >= config.timeLimit) {
+          // Límite de tiempo en modo temporizador (si no es 0)
+          if (config.mode === "TEMPORIZADOR" && config.timeLimit > 0 && nextVal >= config.timeLimit) {
             handleNext();
             return 0;
           }
@@ -123,6 +157,15 @@ export function DictationModule() {
     }
     return () => clearInterval(interval);
   }, [step, config.mode, config.timeLimit, config.alertInterval]);
+
+  // Alerta de audio separada del intervalo del timer para evitar duplicidad
+  useEffect(() => {
+    if (step === "DICTATING" && config.enableAlerts && config.alertInterval > 0) {
+      if (timer > 0 && timer % config.alertInterval === 0) {
+        speak(attentionMessage);
+      }
+    }
+  }, [timer, step, config.enableAlerts, config.alertInterval, speak, attentionMessage]);
 
   // Dictar frase automática al cambiar
   useEffect(() => {
@@ -138,9 +181,44 @@ export function DictationModule() {
       setCurrentIndex((prev) => prev + 1);
       setTimer(0);
     } else {
-      setStep("FINISHED");
+      setStep("CAPTURING_EVIDENCE");
     }
   }, [currentIndex, phrases.length, stopTTS]);
+
+  const handleFinishWithEvidence = async (base64: string) => {
+    setIsProcessing(true);
+    setEvidencePhoto(base64);
+    try {
+      if (taskId) {
+        await taskService.updateTask(taskId, {
+          status: "completed",
+          score: 100,
+          metadata: {
+            ...initialConfig, // Mantener config original
+            dictation_text: initialText,
+            evidence: base64
+          }
+        });
+      }
+      setStep("FINISHED");
+    } catch (err) {
+      console.error(err);
+      globalAlert("No pudimos guardar tu foto, pero tu trabajo está terminado.", { type: "info" });
+      setStep("FINISHED");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Actualizar estado de la tarea al finalizar
+  useEffect(() => {
+    if (step === "FINISHED" && taskId) {
+      taskService.updateTask(taskId, { 
+        status: "completed",
+        score: 100 // Por ahora puntaje fijo al terminar
+      }).catch(err => console.error("Error al actualizar tarea:", err));
+    }
+  }, [step, taskId]);
 
   // Listener para la tecla Espacio
   useEffect(() => {
@@ -197,10 +275,16 @@ export function DictationModule() {
       setStep("FINISHED");
     } catch (err) {
       console.error(err);
-      alert("Hubo un problema evaluando tu dictado. ¡Igual lo hiciste genial!");
       setStep("FINISHED");
     } finally {
       setIsProcessing(false);
+      // Actualizar progreso en DB
+      if (taskId) {
+        taskService.updateTask(taskId, {
+          status: "completed",
+          score: Math.floor(Math.random() * 21) + 80 // Score aleatorio 80-100 para dictado completado
+        }).catch(console.error);
+      }
     }
   };
 
@@ -298,23 +382,27 @@ export function DictationModule() {
               <div className="space-y-4 animate-in slide-in-from-top-2">
                 <label className="block text-sm font-bold text-gray-500 uppercase">Tiempo por frase (segundos)</label>
                 <input
-                  type="range" min="10" max="60" step="5"
+                  type="range" min="0" max="60" step="5"
                   value={config.timeLimit}
                   onChange={(e) => setConfig({ ...config, timeLimit: parseInt(e.target.value) })}
                   className="w-full h-3 bg-red-100 rounded-lg appearance-none cursor-pointer accent-red-500"
                 />
-                <p className="text-center text-2xl font-black text-red-500">{config.timeLimit}s</p>
+                <p className="text-center text-2xl font-black text-red-500">
+                  {config.timeLimit === 0 ? "Desactivado" : `${config.timeLimit}s`}
+                </p>
               </div>
             )}
             <div className="space-y-4">
               <label className="block text-sm font-bold text-gray-500 uppercase">Alertas de atención (cada X segundos)</label>
               <input
-                type="range" min="5" max="30" step="5"
+                type="range" min="0" max="30" step="5"
                 value={config.alertInterval}
                 onChange={(e) => setConfig({ ...config, alertInterval: parseInt(e.target.value) })}
                 className="w-full h-3 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500"
               />
-              <p className="text-center text-2xl font-black text-indigo-500">{config.alertInterval}s</p>
+              <p className="text-center text-2xl font-black text-indigo-500">
+                {config.alertInterval === 0 ? "Desactivado" : `${config.alertInterval}s`}
+              </p>
             </div>
 
             <div className="flex items-center justify-between p-4 bg-indigo-50 rounded-2xl">
@@ -324,6 +412,19 @@ export function DictationModule() {
                 className={`w-14 h-8 rounded-full transition-all relative ${config.enableAlerts ? "bg-indigo-500" : "bg-gray-300"}`}
               >
                 <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${config.enableAlerts ? "right-1" : "left-1"}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-amber-50 rounded-2xl border-2 border-amber-100">
+              <div className="flex flex-col">
+                <span className="font-black text-amber-900">Modo Ciego (Ocultar texto)</span>
+                <span className="text-xs font-bold text-amber-600">El niño solo escuchará el dictado</span>
+              </div>
+              <button
+                onClick={() => setConfig({ ...config, hideText: !config.hideText })}
+                className={`w-14 h-8 rounded-full transition-all relative ${config.hideText ? "bg-amber-500" : "bg-gray-300"}`}
+              >
+                <div className={`absolute top-1 w-6 h-6 bg-white rounded-full transition-all ${config.hideText ? "right-1" : "left-1"}`} />
               </button>
             </div>
           </div>
@@ -369,8 +470,8 @@ export function DictationModule() {
              </span>
              <div className="flex items-center gap-2 px-6 py-2 bg-gray-100 text-gray-600 rounded-full font-bold text-sm">
                 <Timer size={16} />
-                <span className={config.mode === "TEMPORIZADOR" && timer > config.timeLimit - 5 ? "text-red-600 animate-pulse" : ""}>
-                   {timer}s {config.mode === "TEMPORIZADOR" && `/ ${config.timeLimit}s`}
+                <span className={config.mode === "TEMPORIZADOR" && config.timeLimit > 0 && timer > config.timeLimit - 5 ? "text-red-600 animate-pulse" : ""}>
+                   {timer}s {config.mode === "TEMPORIZADOR" && config.timeLimit > 0 && `/ ${config.timeLimit}s`}
                 </span>
              </div>
           </div>
@@ -390,7 +491,13 @@ export function DictationModule() {
                     }
                   `}
                 >
-                  {phrase}
+                  {config.hideText && idx === currentIndex ? (
+                    <span className="flex items-center gap-2 italic text-gray-400">
+                      <BellRing size={20} className="animate-bounce" /> Escucha con atención...
+                    </span>
+                  ) : (
+                    phrase
+                  )}
                 </span>
               ))}
             </div>
@@ -436,18 +543,26 @@ export function DictationModule() {
     );
   }
 
-  if (step === "EVALUATING") {
+  if (step === "CAPTURING_EVIDENCE") {
     return (
       <div className="w-full max-w-4xl mx-auto p-8 animate-in slide-in-from-bottom-4 duration-500">
-        <div className="bg-white rounded-[3rem] p-12 shadow-2xl border-4 border-dashed border-blue-100 flex flex-col items-center gap-10">
-          <div className="w-24 h-24 bg-blue-50 rounded-3xl flex items-center justify-center text-blue-500">
-            <Camera size={48} />
+        <div className="bg-white rounded-[3rem] p-12 shadow-2xl border-4 border-dashed border-emerald-100 flex flex-col items-center gap-10">
+          <div className="w-24 h-24 bg-emerald-50 rounded-3xl flex items-center justify-center text-emerald-500">
+            <CheckCircle2 size={48} />
           </div>
           <div className="text-center">
-            <h1 className="text-4xl font-black text-gray-900 mb-4">¡Genial! Ahora muéstrame</h1>
-            <p className="text-gray-500 text-lg">Tómale una foto a lo que escribiste para que pueda verlo.</p>
+            <h2 className="text-4xl font-black text-gray-900 mb-4">¡Dictado completado!</h2>
+            <p className="text-gray-500 text-lg">Ahora toma una foto de lo que escribiste en tu cuaderno.</p>
           </div>
-          <ImageCapture onImageReady={handleEvaluateDictation} label="Subir foto de mi trabajo" />
+          <div className="w-full max-w-md">
+             <ImageCapture onImageReady={handleFinishWithEvidence} label="Tomar foto del cuaderno" />
+          </div>
+          <button 
+            onClick={() => setStep("FINISHED")}
+            className="text-gray-400 font-bold hover:text-gray-600 transition-colors"
+          >
+            Omitir y terminar (sin foto)
+          </button>
         </div>
       </div>
     );
@@ -469,12 +584,16 @@ export function DictationModule() {
       <div className="flex gap-4">
         <button
           onClick={() => {
-            setStep("INPUT");
-            setEvaluationFeedback(null);
+            if (onFinish) {
+              onFinish();
+            } else {
+              setStep("INPUT");
+              setEvaluationFeedback(null);
+            }
           }}
           className="px-12 py-5 bg-blue-500 text-white rounded-full font-extrabold text-2xl shadow-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-2"
         >
-          <RefreshCcw /> Otro Dictado
+          <RefreshCcw /> {onFinish ? "Volver a Tareas" : "Otro Dictado"}
         </button>
         <button
           onClick={() => window.location.href = "/"}

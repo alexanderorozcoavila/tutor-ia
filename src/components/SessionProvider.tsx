@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { updateStudentXP } from "@/actions/studentActions";
+import { useAlert } from "@/lib/AlertContext";
 
 interface SessionContextType {
   timeRemaining: number;
@@ -19,6 +20,7 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined);
 const MAX_SESSION_TIME = 15 * 60; 
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const { showAlert } = useAlert();
   const [timeRemaining, setTimeRemaining] = useState(MAX_SESSION_TIME);
   const [xp, setXp] = useState(0);
   const [isSessionActive, setIsSessionActive] = useState(false);
@@ -48,8 +50,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   
   const endSession = () => {
     setIsSessionActive(false);
-    // Mostrar premio final
-    alert(`¡Has completado tu sesión hoy! Ganaste ${xp} XP. ¡Eres increíble!`);
+    showAlert(`¡Has completado tu sesión hoy! Ganaste ${xp} XP. ¡Eres increíble!`, { type: "success" });
   };
 
   return (

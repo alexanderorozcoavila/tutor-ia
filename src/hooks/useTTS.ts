@@ -36,28 +36,47 @@ export function useTTS(options: TTSOptions = {}) {
         return;
       }
 
-      window.speechSynthesis.cancel(); // Detener si algo más está hablando
+      // window.speechSynthesis.cancel(); // Solo cancelar si es estrictamente necesario o usar un flag
 
       const utterance = new SpeechSynthesisUtterance(text);
       
-      // Select Spanish voice, preferably friendly or native
-      const spanishVoices = voices.filter(v => v.lang.startsWith("es"));
-      const selectedVoice = spanishVoices.find(v => v.name.includes("Google") || v.name.includes("Microsoft")) || spanishVoices[0];
+      // Intentar obtener voces actualizadas si el estado local está vacío
+      let currentVoices = voices;
+      if (currentVoices.length === 0) {
+        currentVoices = window.speechSynthesis.getVoices();
+      }
+
+      // Select Spanish voice
+      const spanishVoices = currentVoices.filter(v => v.lang.startsWith("es"));
+      const selectedVoice = spanishVoices.find(v => v.name.includes("Google") || v.name.includes("Microsoft") || v.name.includes("Mónica") || v.name.includes("Helena")) || spanishVoices[0];
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;
       }
 
-      utterance.pitch = options.pitch ?? 1.1; // Ligeramente agudo para ser "amigable"
-      utterance.rate = options.rate ?? 0.85; // Ligeramente más lento para TDA/TEA
+      utterance.pitch = options.pitch ?? 1.1;
+      utterance.rate = options.rate ?? 0.85;
       utterance.lang = options.lang ?? "es-ES";
 
+      const handleEnd = () => setIsSpeaking(false);
+      
       utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
+      utterance.onend = handleEnd;
       utterance.onerror = (e) => {
         console.error("Error en TTS:", e);
         setIsSpeaking(false);
+        // Si el error es 'interrupted', a veces es normal por cancel()
       };
+
+      // Algunas versiones de Chrome necesitan esto para no pausarse en frases largas
+      const resumeInfinity = setInterval(() => {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        } else {
+          clearInterval(resumeInfinity);
+        }
+      }, 10000);
 
       window.speechSynthesis.speak(utterance);
     },
