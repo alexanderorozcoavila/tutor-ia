@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  /* Pastel warm background, dark high-contrast text for less visual noise */
+  --background: #fdfbf7;
+  --foreground: #2d3748;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-comic-neue);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Muted dark background, warm pastel text */
+    --background: #1a202c;
+    --foreground: #f7fafc;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Reducción global de animaciones (Bajo ruido visual preventivo para TDA/TEA) */
+* {
+  --transition-duration: 0.1s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
