@@ -122,12 +122,11 @@ export const userService = {
 
     const { data, error } = await supabase
       .from('tutor_students')
-      .select('users(*)')
+      .select('student:student_id(*)')
       .eq('tutor_id', tutorId);
     
     if (error) throw error;
-    // Supabase devuelve array de objetos con propiedad users
-    return (data as any[]).map(d => d.users) as User[];
+    return (data as any[]).map(d => d.student) as User[];
   },
 
   async assignStudentToTutor(tutorId: string, studentId: string) {
