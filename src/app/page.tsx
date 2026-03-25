@@ -8,6 +8,7 @@ import { TutorDashboard } from "@/components/TutorDashboard";
 import { TaskDashboard } from "@/components/TaskDashboard";
 import { DictationModule } from "@/components/DictationModule";
 import { DomesticTaskModule } from "@/components/DomesticTaskModule";
+import { ReadingModule } from "@/components/ReadingModule";
 import { FullScreenWrapper } from "@/components/FullScreenWrapper";
 import { Task } from "@/lib/taskService";
 import { LogOut, Sparkles } from "lucide-react";
@@ -41,6 +42,14 @@ function AppContent() {
             initialText={activeTask.metadata.dictation_text} 
             initialConfig={activeTask.metadata.config}
             onFinish={() => setActiveTask(null)} 
+          />
+        );
+      }
+      if (activeTask.type === "reading") {
+        return (
+          <ReadingModule 
+            task={activeTask}
+            onFinish={() => setActiveTask(null)}
           />
         );
       }

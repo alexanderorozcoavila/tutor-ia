@@ -17,8 +17,12 @@ export function useAudioRecorder() {
       audioChunksRef.current = [];
       setAudioBlob(null);
 
-      // We use webm since it is standard in browsers, Whisper will convert to audio
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      // En Safari iOS, audio/webm a menudo falla. Vamos a dejar que el navegador elija su formato óptimo (mp4, ogg, etc.)
+      const options = MediaRecorder.isTypeSupported('audio/webm') 
+        ? { mimeType: 'audio/webm' } 
+        : undefined;
+
+      const mediaRecorder = new MediaRecorder(stream, options);
       
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
@@ -27,7 +31,8 @@ export function useAudioRecorder() {
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const type = options?.mimeType || mediaRecorder.mimeType || 'audio/mp4'; // Fallback heurístico para envíos
+        const audioBlob = new Blob(audioChunksRef.current, { type });
         setAudioBlob(audioBlob);
         
         // Stop all tracks to release microphone

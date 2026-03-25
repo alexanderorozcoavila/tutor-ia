@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
-export type TaskType = 'dictation' | 'domestic';
+export type TaskType = 'dictation' | 'domestic' | 'reading';
 export type TaskStatus = 'pending' | 'completed' | 'failed' | 'approved' | 'rejected';
 
 export interface Task {
@@ -16,6 +16,8 @@ export interface Task {
   created_by?: string;
   metadata: {
     dictation_text?: string;
+    reading_text?: string;
+    reading_level?: number;
     config?: {
       mode: 'LIBRE' | 'TEMPORIZADOR';
       timeLimit: number;

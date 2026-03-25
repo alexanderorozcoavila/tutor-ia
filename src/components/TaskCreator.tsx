@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { taskService, TaskType } from "@/lib/taskService";
-import { Plus, BookOpen, Home, Save, X } from "lucide-react";
+import { Plus, BookOpen, Home, Save, X, BookA } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
 
 interface Props {
@@ -22,29 +22,54 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   const [alertInterval, setAlertInterval] = useState(10);
   const [enableAlerts, setEnableAlerts] = useState(true);
   const [hideText, setHideText] = useState(false);
+  const [readingLevel, setReadingLevel] = useState<number>(1);
+  const [readingText, setReadingText] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  const READING_LEVELS: Record<number, string> = {
+    1: "ma me mi mo mu. pa pe pi po pu.",
+    2: "Mi mamá me mima. Ese oso se asea.",
+    3: "Había una vez un pequeño perro llamado Toby. Le gustaba correr por el parque y jugar con la pelota.",
+    4: "El universo es increíblemente vasto y misterioso. Los planetas orbitan alrededor del sol formando nuestro sistema solar, el cual es solo una pequeña parte de la Vía Láctea."
+  };
+
+  const handleLevelChange = (level: number) => {
+    setReadingLevel(level);
+    setReadingText(READING_LEVELS[level]);
+  };
 
   const handleSave = async () => {
     if (!title) return showAlert("Por favor ponle un título a la tarea.", { type: "info" });
     if (type === "dictation" && !dictationText) return showAlert("El dictado necesita un texto.", { type: "info" });
+    if (type === "reading" && !readingText) return showAlert("La actividad de lectura necesita un texto.", { type: "info" });
 
     setIsSaving(true);
+    let metadata: any = {};
+    if (type === "dictation") {
+      metadata = {
+        dictation_text: dictationText,
+        config: {
+          mode,
+          timeLimit: mode === "TEMPORIZADOR" ? timeLimit : 0,
+          alertInterval,
+          enableAlerts,
+          hideText
+        }
+      };
+    } else if (type === "reading") {
+      metadata = {
+        reading_text: readingText,
+        reading_level: readingLevel
+      };
+    }
+
     try {
       await taskService.createTask({
         title,
         description,
         type,
         assigned_to: studentId,
-        metadata: type === "dictation" ? { 
-          dictation_text: dictationText,
-          config: {
-            mode,
-            timeLimit: mode === "TEMPORIZADOR" ? timeLimit : 0,
-            alertInterval,
-            enableAlerts,
-            hideText
-          }
-        } : {},
+        metadata,
       });
       onTaskCreated();
     } catch (err) {
@@ -66,18 +91,24 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
 
       <div className="space-y-6">
         {/* Selector de Tipo */}
-        <div className="flex gap-4 p-2 bg-gray-50 rounded-2xl">
+        <div className="flex gap-4 p-2 bg-gray-50 rounded-2xl flex-wrap or overflow-x-auto">
           <button
             onClick={() => setType("dictation")}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-xl font-bold transition-all ${type === "dictation" ? "bg-white shadow-md text-blue-600" : "text-gray-400"}`}
+            className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-4 rounded-xl font-bold transition-all ${type === "dictation" ? "bg-white shadow-md text-blue-600" : "text-gray-400"}`}
           >
             <BookOpen size={20} /> Dictado
           </button>
           <button
-            onClick={() => setType("domestic")}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-xl font-bold transition-all ${type === "domestic" ? "bg-white shadow-md text-emerald-600" : "text-gray-400"}`}
+            onClick={() => setType("reading")}
+            className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-4 rounded-xl font-bold transition-all ${type === "reading" ? "bg-white shadow-md text-amber-500" : "text-gray-400"}`}
           >
-            <Home size={20} /> Tarea del Hogar
+            <BookA size={20} /> Lectura
+          </button>
+          <button
+            onClick={() => setType("domestic")}
+            className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-4 rounded-xl font-bold transition-all ${type === "domestic" ? "bg-white shadow-md text-emerald-600" : "text-gray-400"}`}
+          >
+            <Home size={20} /> Del Hogar
           </button>
         </div>
 
@@ -188,6 +219,36 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
               >
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${hideText ? "right-1" : "left-1"}`} />
               </button>
+            </div>
+          </div>
+        )}
+
+        {type === "reading" && (
+          <div className="space-y-6 animate-in slide-in-from-top-2 bg-amber-50/30 p-6 rounded-[2rem] border-2 border-amber-100">
+            <div className="space-y-4">
+              <label className="text-sm font-black text-gray-400 uppercase tracking-wider">Nivel Sugerido (Opcional)</label>
+              <div className="flex gap-2 bg-white p-1 rounded-xl border-2 border-amber-100 overflow-x-auto">
+                {[1, 2, 3, 4].map(lvl => (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => handleLevelChange(lvl)}
+                    className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap px-4 ${readingLevel === lvl ? "bg-amber-500 text-white shadow-md" : "text-gray-400"}`}
+                  >
+                    Nivel {lvl}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-black text-gray-400 uppercase tracking-wider">Texto para que el alumno lea</label>
+              <textarea
+                value={readingText}
+                onChange={(e) => setReadingText(e.target.value)}
+                placeholder="Escribe aquí el texto a leer, o selecciona un nivel arriba..."
+                className="w-full p-4 rounded-2xl border-2 border-amber-100 bg-white focus:border-amber-300 focus:outline-none transition-all h-32 resize-none font-medium text-lg leading-relaxed"
+              />
             </div>
           </div>
         )}

@@ -12,7 +12,8 @@ export async function POST(request: Request) {
 
     // Groq requires standard FormData with model definition
     const apiFormData = new FormData();
-    apiFormData.append("file", audioFile, "audio.webm");
+    const extension = audioFile.type.includes("mp4") ? "mp4" : "webm";
+    apiFormData.append("file", audioFile, `audio.${extension}`);
     apiFormData.append("model", "whisper-large-v3-turbo");
     apiFormData.append("response_format", "json");
     apiFormData.append("language", "es");

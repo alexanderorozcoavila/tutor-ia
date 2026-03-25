@@ -4,8 +4,13 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 DO $$ BEGIN
-    CREATE TYPE task_type AS ENUM ('dictation', 'domestic');
+    CREATE TYPE task_type AS ENUM ('dictation', 'domestic', 'reading');
 EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- En caso de que ya exista, intentamos agregar el nuevo valor:
+DO $$ BEGIN
+    ALTER TYPE task_type ADD VALUE IF NOT EXISTS 'reading';
+EXCEPTION WHEN OTHERS THEN null; END $$;
 
 DO $$ BEGIN
     CREATE TYPE task_status AS ENUM ('pending', 'completed', 'approved', 'rejected');
