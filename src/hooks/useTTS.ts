@@ -46,15 +46,32 @@ export function useTTS(options: TTSOptions = {}) {
         currentVoices = window.speechSynthesis.getVoices();
       }
 
-      // Select Spanish voice
       const spanishVoices = currentVoices.filter(v => v.lang.startsWith("es"));
-      const selectedVoice = spanishVoices.find(v => v.name.includes("Google") || v.name.includes("Microsoft") || v.name.includes("Mónica") || v.name.includes("Helena")) || spanishVoices[0];
+
+      // Intentar encontrar voces con redes neuronales o de alta calidad (Premium, Network)
+      const premiumVoice = spanishVoices.find(v => 
+        v.name.includes("Premium") || 
+        v.name.includes("Network") || 
+        v.name.includes("Natural") || 
+        v.name.includes("Google español (Estados Unidos)") || 
+        v.name.includes("Paulina")
+      );
+
+      const defaultVoice = spanishVoices.find(v => 
+        v.name.includes("Google") || 
+        v.name.includes("Microsoft") || 
+        v.name.includes("Mónica") || 
+        v.name.includes("Helena")
+      ) || spanishVoices[0];
+
+      const selectedVoice = premiumVoice || defaultVoice;
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;
       }
 
-      utterance.pitch = options.pitch ?? 1.1;
+      // Dejar pitch natural para voces premium
+      utterance.pitch = options.pitch ?? (premiumVoice ? 1.0 : 1.1);
       utterance.rate = options.rate ?? 0.85;
       utterance.lang = options.lang ?? "es-ES";
 

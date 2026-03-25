@@ -113,33 +113,33 @@ export function ReadingModule({ task, onFinish }: Props) {
   };
 
   return (
-    <div className="w-full flex flex-col items-center gap-8 max-w-4xl mx-auto py-12 px-4 select-none touch-none">
+    <div className="w-full flex flex-col items-center gap-4 md:gap-8 max-w-4xl mx-auto py-4 md:py-12 px-2 md:px-4 select-none touch-none overflow-hidden h-full">
       <ProgressBar />
       
-      <div className="bg-white/90 backdrop-blur-md p-8 md:p-12 rounded-[3.5rem] shadow-2xl border-4 border-amber-50 flex flex-col items-center gap-10 w-full min-h-[500px]">
+      <div className="bg-white/90 backdrop-blur-md p-4 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl border-4 border-amber-50 flex flex-col items-center gap-4 md:gap-10 w-full flex-grow md:min-h-[500px]">
         
         {/* Etiqueta y Título */}
-        <div className="flex flex-col items-center gap-3 w-full">
-          <div className="px-6 py-2 bg-amber-100 text-amber-600 rounded-full font-bold text-sm uppercase tracking-widest flex items-center gap-2">
-            <BookOpen size={16} /> ¡A Leer!
+        <div className="flex flex-col items-center gap-2 w-full shrink-0">
+          <div className="px-4 py-1.5 md:px-6 md:py-2 bg-amber-100 text-amber-600 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-widest flex items-center gap-2">
+            <BookOpen size={14} /> ¡A Leer!
           </div>
-          <h2 className="text-2xl font-black text-gray-800 tracking-tight text-center truncate w-full">
+          <h2 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight text-center truncate w-full">
             {task.title}
           </h2>
         </div>
 
         {/* Zona del Texto Gigante */}
-        <div className="w-full bg-amber-50/50 p-8 rounded-[2rem] border-2 border-amber-100 shadow-inner flex-1 flex items-center justify-center min-h-[150px]">
+        <div className="w-full bg-amber-50/50 p-4 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border-2 border-amber-100 shadow-inner flex shrink-0 items-center justify-center h-[20vh] md:min-h-[150px] overflow-y-auto">
           <p 
-            className="font-black text-center text-gray-800 leading-relaxed"
-            style={{ fontFamily: "'Comic Neue', 'Arial Rounded MT Bold', sans-serif", fontSize: 'clamp(1.5rem, 5vw, 2.5rem)' }}
+            className="font-black text-center text-gray-800 leading-tight md:leading-relaxed mx-auto w-full break-words"
+            style={{ fontFamily: "'Comic Neue', 'Arial Rounded MT Bold', sans-serif", fontSize: 'clamp(1.2rem, 4vh, 2.5rem)' }}
           >
             {textToRead}
           </p>
         </div>
 
         {/* Zona de Interacción Central */}
-        <div className="w-full min-h-[160px] flex flex-col items-center justify-center gap-6">
+        <div className="w-full flex-1 flex flex-col items-center justify-center gap-4 md:gap-6 shrink-0 h-[30vh]">
           
           {state === "PROCESSING" && (
             <div className="flex flex-col items-center gap-4 animate-in fade-in zoom-in duration-300">
@@ -162,20 +162,20 @@ export function ReadingModule({ task, onFinish }: Props) {
                   onTouchEnd={handlePressEnd}
                   disabled={state !== "WAITING_PRESS" && state !== "RECORDING"}
                   className={`
-                    relative w-40 h-32 md:w-64 md:h-40 rounded-[3rem] shadow-[0_10px_0_0_rgba(0,0,0,0.1)] transition-all flex flex-col items-center justify-center gap-2 select-none
+                    relative w-40 h-24 md:w-64 md:h-40 rounded-[2rem] md:rounded-[3rem] shadow-[0_8px_0_0_rgba(0,0,0,0.1)] transition-all flex flex-col items-center justify-center gap-1 md:gap-2 select-none mx-auto
                     ${state === "RECORDING" 
                       ? "bg-red-500 hover:bg-red-600 text-white translate-y-2 shadow-[0_2px_0_0_rgba(0,0,0,0.1)] scale-95" 
-                      : "bg-blue-500 hover:bg-blue-600 text-white hover:translate-y-1 hover:shadow-[0_8px_0_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-[0_2px_0_0_rgba(0,0,0,0.1)] cursor-pointer"
+                      : "bg-blue-500 hover:bg-blue-600 text-white hover:translate-y-1 hover:shadow-[0_6px_0_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-[0_2px_0_0_rgba(0,0,0,0.1)] cursor-pointer"
                     }
                   `}
                 >
-                  <Mic size={48} className={state === "RECORDING" ? "animate-pulse" : ""} />
-                  <span className="font-black text-xl uppercase tracking-wider text-center px-4">
-                    {state === "RECORDING" ? "¡Habla Ahora!" : "Pulsar para Leer"}
+                  <Mic size={36} className={`md:w-12 md:h-12 ${state === "RECORDING" ? "animate-pulse" : ""}`} />
+                  <span className="font-black text-sm md:text-xl uppercase tracking-wider text-center px-4 leading-tight">
+                    {state === "RECORDING" ? "¡Habla!" : "Pulsar y Leer"}
                   </span>
                 </button>
               </div>
-              <p className="text-gray-400 font-bold max-w-[250px] text-center mt-4">
+              <p className="text-gray-400 font-bold max-w-[250px] text-center mt-2 text-xs md:text-base leading-tight">
                 {state === "RECORDING" 
                   ? "Suelta el botón cuando termines la lectura." 
                   : "Mantén tu dedo sobre el botón mientras lees."}
@@ -184,39 +184,39 @@ export function ReadingModule({ task, onFinish }: Props) {
           )}
 
           {state === "FEEDBACK" && (
-            <div className="flex flex-col items-center gap-8 px-6 w-full animate-in slide-in-from-bottom-8 duration-500">
-              <div className="flex items-center gap-6 bg-emerald-50 w-full p-8 rounded-3xl border-4 border-emerald-200 shadow-xl">
-                <div className="p-4 bg-white rounded-2xl shadow-sm relative shrink-0">
-                  <Volume2 size={40} className="text-emerald-500 animate-pulse" />
-                  {score >= 80 && <Star size={24} className="text-yellow-400 absolute -top-3 -right-3 fill-yellow-400 animate-bounce" />}
+            <div className="flex flex-col items-center gap-4 md:gap-8 w-full animate-in slide-in-from-bottom-4 duration-500">
+              <div className="flex items-center gap-4 md:gap-6 bg-emerald-50 w-full p-4 md:p-8 rounded-[2rem] border-4 border-emerald-200 shadow-xl max-h-[160px] overflow-y-auto">
+                <div className="p-3 bg-white rounded-2xl shadow-sm relative shrink-0 hidden md:block">
+                  <Volume2 size={32} className="text-emerald-500 animate-pulse" />
+                  {score >= 80 && <Star size={20} className="text-yellow-400 absolute -top-3 -right-3 fill-yellow-400 animate-bounce" />}
                 </div>
-                <div>
-                  <p className="text-3xl font-black text-gray-800 leading-tight mb-2">
+                <div className="w-full">
+                  <p className="text-lg md:text-3xl font-black text-gray-800 leading-tight md:leading-tight mb-2">
                     {feedback}
                   </p>
                   <div className="flex items-center gap-2">
-                     <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                     <div className="flex-1 h-2 md:h-3 bg-gray-200 rounded-full overflow-hidden">
                        <div className="h-full bg-emerald-500" style={{ width: `${score}%` }} />
                      </div>
-                     <span className="text-emerald-600 font-black text-sm">{score}%</span>
+                     <span className="text-emerald-600 font-black text-xs md:text-sm">{score}%</span>
                   </div>
                 </div>
               </div>
               
-              <div className="flex gap-4">
+              <div className="flex flex-row md:gap-4 gap-2 w-full justify-center mt-2 shrink-0">
                 {score < 80 && (
                   <button
                     onClick={() => setState("WAITING_PRESS")}
-                    className="px-8 py-5 font-black text-xl rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200"
+                    className="flex-1 max-w-[160px] py-3 md:px-8 md:py-5 font-black text-sm md:text-xl rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200"
                   >
-                    Intentar de nuevo
+                    Reintentar
                   </button>
                 )}
                 <button
                   onClick={onFinish}
-                  className="px-10 py-5 font-black text-2xl rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 bg-amber-500 text-white hover:bg-amber-600"
+                  className="flex-1 max-w-[200px] py-3 md:px-10 md:py-5 font-black text-base md:text-2xl rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 bg-amber-500 text-white hover:bg-amber-600 flex items-center justify-center gap-2"
                 >
-                  ¡Siguiente aventura! ➡️
+                  Siguiente ➡️
                 </button>
               </div>
             </div>
