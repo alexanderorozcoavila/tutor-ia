@@ -1,13 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Task, taskService } from "@/lib/taskService";
 import { useTTS } from "@/hooks/useTTS";
 import { useSession } from "@/components/SessionProvider";
 import { ProgressBar } from "@/components/ProgressBar";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAlert } from "@/lib/AlertContext";
-import { Loader2, Mic, Volume2, Star, CheckCircle2 } from "lucide-react";
+import { Loader2, Mic, Volume2, Star, CheckCircle2, BookOpen } from "lucide-react";
 
 interface Props {
   task: Task;
@@ -26,9 +26,14 @@ export function ReadingModule({ task, onFinish }: Props) {
 
   const textToRead = task.metadata.reading_text || "Texto no configurado";
 
+  // Prevent multiple calls to instruction
+  const hasInstructed = useRef(false);
+
   useEffect(() => {
-    // Instrucción inicial
-    speak("¡A leer! Mantén presionado el botón gigante azul mientras lees el texto de la pantalla. Suéltalo cuando termines.");
+    if (!hasInstructed.current) {
+      hasInstructed.current = true;
+      speak("¡A leer! Mantén presionado el botón gigante azul mientras lees el texto de la pantalla. Suéltalo cuando termines.");
+    }
   }, [speak]);
 
   useEffect(() => {
