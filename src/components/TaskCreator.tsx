@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { taskService, TaskType } from "@/lib/taskService";
-import { Plus, BookOpen, Home, Save, X, BookA, Laptop, Tablet, Smartphone } from "lucide-react";
+import { Plus, BookOpen, Home, Save, X, BookA, Laptop, Tablet, Smartphone, Database } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
 import { RichTextEditor } from "@/components/RichTextEditor";
 
@@ -27,6 +27,7 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   const [readingText, setReadingText] = useState("");
   const [supportedDevices, setSupportedDevices] = useState<string[]>(['desktop', 'tablet', 'mobile']);
   const [isSaving, setIsSaving] = useState(false);
+  const [showRaw, setShowRaw] = useState(false);
 
   const toggleDevice = (dev: string) => {
     setSupportedDevices(prev => {
@@ -173,12 +174,38 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
         {type === "dictation" && (
           <div className="space-y-6 animate-in slide-in-from-top-2 bg-indigo-50/30 p-6 rounded-[2rem] border-2 border-indigo-100">
             <div className="space-y-2">
-              <label className="text-sm font-black text-gray-400 uppercase tracking-wider">Texto para dictar</label>
+              <div className="flex justify-between items-center">
+                <label className="text-sm font-black text-gray-400 uppercase tracking-wider">Texto para dictar</label>
+                <button
+                  type="button"
+                  onClick={() => setShowRaw(!showRaw)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase transition-all ${showRaw ? "bg-indigo-600 text-white shadow-md shadow-indigo-100" : "bg-white text-gray-400 border border-gray-200 hover:text-indigo-500"}`}
+                  title="Ver cómo se guarda en DB"
+                >
+                  <Database size={12} /> {showRaw ? "Ocultar Código" : "Ver Código"}
+                </button>
+              </div>
               <RichTextEditor
                 content={dictationText}
                 onChange={setDictationText}
                 placeholder="Escribe aquí el texto que el alumno leerá y transcribirá..."
               />
+              
+              {showRaw && (
+                <div className="mt-4 p-4 bg-gray-900 rounded-2xl border-2 border-indigo-200 shadow-inner overflow-hidden animate-in slide-in-from-top-1 duration-200">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Storage: metadata.dictation_text</span>
+                    <div className="flex gap-1">
+                      <div className="w-2 h-2 rounded-full bg-red-500/50" />
+                      <div className="w-2 h-2 rounded-full bg-amber-500/50" />
+                      <div className="w-2 h-2 rounded-full bg-emerald-500/50" />
+                    </div>
+                  </div>
+                  <pre className="text-xs font-mono text-indigo-100 whitespace-pre-wrap break-all leading-relaxed max-h-[200px] overflow-y-auto custom-scrollbar italic bg-black/30 p-3 rounded-lg border border-white/5">
+                    {dictationText || "<!-- El texto aparecerá aquí -->"}
+                  </pre>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">

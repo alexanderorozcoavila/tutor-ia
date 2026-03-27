@@ -107,34 +107,51 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   }, []);
 
   // ─── annotateHTML: inyecta data-phrase-index en el HTML enriquecido ──────────
-  // Estrategia: indexOf posicional en lugar de regex para manejar caracteres
-  // especiales (¿?¡!, paréntesis, puntos) sin escapado ni falsos negativos.
-  // Normaliza espacios múltiples antes de buscar para tolerar variaciones menores.
+  // Estrategia: "Tag-Blind Matching". Construye una Regex por cada frase que permite
+  // la existencia opcional de etiquetas HTML entre cada carácter. Esto asegura
+  // que el resaltado funcione incluso si el tutor usó negritas o cursivas en
+  // medio de una oración.
   const annotateHTML = useCallback((html: string, phrasesArray: string[]): string => {
     let result = html;
-    let searchFrom = 0; // puntero que avanza para evitar re-marcar frases ya anotadas
+    let searchFromIndex = 0;
+
+    const escapeRegex = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     phrasesArray.forEach((phrase, idx) => {
-      // Normalizar la frase a buscar: recortar y colapsar espacios múltiples
+      // Normalizar: colapsar espacios y escapar para Regex
       const normalized = phrase.trim().replace(/\s+/g, ' ');
       if (!normalized) return;
 
-      // Buscar a partir de la posición donde quedamos (evita colisiones con frases iguales)
-      const pos = result.indexOf(normalized, searchFrom);
-      if (pos === -1) return; // frase no encontrada en el HTML — skip silencioso
+      // Construir patrón "ciego a etiquetas":
+      // Cada carácter de la frase puede estar seguido de cero o más etiquetas HTML.
+      // Los espacios se tratan como \s+ (uno o más espacios en blanco).
+      const pattern = normalized
+        .split('')
+        .map(char => (char === ' ' ? '\\s+' : escapeRegex(char)))
+        .join('(<[^>]+>)*');
 
-      const open = `<span data-phrase-index="${idx}" class="phrase-span">`;
-      const close = `</span>`;
+      // Buscar la frase a partir de donde quedamos
+      const regex = new RegExp(pattern, 'i');
+      const fragment = result.slice(searchFromIndex);
+      const match = fragment.match(regex);
 
-      result =
-        result.slice(0, pos) +
-        open +
-        result.slice(pos, pos + normalized.length) +
-        close +
-        result.slice(pos + normalized.length);
+      if (match && match.index !== undefined) {
+        const absolutePos = searchFromIndex + match.index;
+        const matchText = match[0];
+        const openTag = `<span data-phrase-index="${idx}" class="phrase-span">`;
+        const closeTag = `</span>`;
 
-      // Avanzar el puntero más allá del span recién insertado
-      searchFrom = pos + open.length + normalized.length + close.length;
+        // Insertar el span alrededor del texto encontrado (que incluye sus etiquetas internas)
+        result =
+          result.slice(0, absolutePos) +
+          openTag +
+          matchText +
+          closeTag +
+          result.slice(absolutePos + matchText.length);
+
+        // Avanzar el puntero para la siguiente frase
+        searchFromIndex = absolutePos + openTag.length + matchText.length + closeTag.length;
+      }
     });
 
     return result;
