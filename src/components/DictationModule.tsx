@@ -12,6 +12,7 @@ import {
   Play, StopCircle, BellRing, AlertTriangle 
 } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
+import parse from "html-react-parser";
 
 type Mode = "LIBRE" | "TEMPORIZADOR";
 
@@ -58,27 +59,42 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   const { isRecording, startRecording, stopRecording, audioBlob } = useAudioRecorder();
   const alertTimerRef = useRef<number>(0);
 
-  // Dividir texto en frases por pausas gramaticales
-  const processPhrases = (text: string) => {
-    // Dividir por puntos, exclamaciones o interrogaciones seguidos de espacio o fin de línea
-    // También dividimos por saltos de línea y por comas si la frase es muy larga
-    const cleanText = text.trim();
+  // Extrae texto plano del HTML usando regex — compatible con SSR, sin necesidad del DOM.
+  // Añade un salto de línea después de cada elemento de bloque para que la segmentación
+  // por signos de puntuación funcione correctamente frase a frase.
+  const htmlToPlainText = (html: string): string => {
+    return html
+      // Reemplazar cierres de bloques con salto de línea
+      .replace(/<\/(p|h[1-6]|li|div|blockquote)>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      // Eliminar todas las etiquetas HTML restantes
+      .replace(/<[^>]+>/g, '')
+      // Decodificar entidades HTML comunes
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      // Normalizar múltiples saltos de línea a uno
+      .replace(/\n{2,}/g, '\n')
+      .trim();
+  };
+
+  // Dividir texto en frases estricto por oraciones completas
+  const processPhrases = (input: string) => {
+    // Si el texto viene en HTML, extraemos el texto plano para el TTS
+    const isHtml = /<[a-z][\s\S]*>/i.test(input);
+    const plainText = isHtml ? htmlToPlainText(input) : input;
+    const cleanText = plainText.trim();
     
-    // Regex para dividir por . ! ? \n manteniendo el signo
-    const parts = cleanText.split(/(?<=[.!?\n])\s+/);
+    // Regex estricto: divide por signos de final de oración (. ! ? y saltos de línea).
+    // Las comas NO se usan para segmentar; el TTS las maneja de forma natural.
+    const parts = cleanText.split(/(?<=[.!?])\s+|\n+/);
     
     const finalPhrases: string[] = [];
     parts.forEach(part => {
       const trimmed = part.trim();
-      if (!trimmed) return;
-      
-      // Si una frase es demasiado larga (más de 12 palabras), intentamos dividirla por comas
-      if (trimmed.split(/\s+/).length > 12) {
-        const subParts = trimmed.split(/(?<=[,;])\s+/);
-        finalPhrases.push(...subParts.map(p => p.trim()).filter(p => p.length > 0));
-      } else {
-        finalPhrases.push(trimmed);
-      }
+      if (trimmed) finalPhrases.push(trimmed);
     });
 
     setPhrases(finalPhrases);
@@ -175,28 +191,49 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   }, [step, currentIndex, phrases, speak]);
 
   const handleNext = useCallback(() => {
+    if (isSpeaking) return; // Bloquear salto si está hablando (PLAYING -> bloquear inputs)
     console.log("Avanzando a la siguiente frase...");
-    stopTTS(); // Detener audio actual si sigue hablando
+    stopTTS(); // Por seguridad detener cualquier remanente
     if (currentIndex < phrases.length - 1) {
       setCurrentIndex((prev) => prev + 1);
       setTimer(0);
     } else {
       setStep("CAPTURING_EVIDENCE");
     }
-  }, [currentIndex, phrases.length, stopTTS]);
+  }, [currentIndex, phrases.length, stopTTS, isSpeaking]);
 
   const handleFinishWithEvidence = async (base64: string) => {
     setIsProcessing(true);
-    setEvidencePhoto(base64);
+    
     try {
+      // 1. Pipeline de compresión de imágenes WebP antes de DB
+      let finalBase64 = base64;
+      try {
+        const res = await fetch("/api/compress-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64Image: base64 })
+        });
+        if (res.ok) {
+          const { compressedImage } = await res.json();
+          if (compressedImage) finalBase64 = compressedImage;
+        }
+      } catch (e) {
+        console.warn("No se pudo comprimir la imagen, usando original.", e);
+      }
+
+      setEvidencePhoto(finalBase64);
+
       if (taskId) {
         await taskService.updateTask(taskId, {
           status: "completed",
           score: 100,
+          // Guardar base64 puro en la nueva columna BYTEA
+          image_data: finalBase64.split(",")[1] || finalBase64,
+          image_mime_type: 'image/webp',
           metadata: {
             ...initialConfig, // Mantener config original
-            dictation_text: initialText,
-            evidence: base64
+            dictation_text: initialText
           }
         });
       }
@@ -220,19 +257,30 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
     }
   }, [step, taskId]);
 
-  // Listener para la tecla Espacio
+  // Listener para la tecla Espacio — blureamos el elemento activo para que window reciba el evento
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (step === "DICTATING" && e.code === "Space") {
+      if (step === "DICTATING" && !isSpeaking && e.code === "Space") {
         e.preventDefault();
+        // Devolver el foco al documento aunque se haya clickeado un botón
+        if (document.activeElement instanceof HTMLElement) {
+          document.activeElement.blur();
+        }
         handleNext();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [step, handleNext]);
+  }, [step, handleNext, isSpeaking]);
+
+  // Refs para acceder al estado actualizado en handleVoiceCommand sin stale closures
+  const handleNextRef = useRef(handleNext);
+  const isSpeakingRef = useRef(isSpeaking);
+  useEffect(() => { handleNextRef.current = handleNext; }, [handleNext]);
+  useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
 
   // Lógica de Reconocimiento de Voz para el comando "¡Listo, ya copié!"
+  // Usa refs para evitar stale closures sobre isSpeaking y handleNext
   const handleVoiceCommand = useCallback(async (blob: Blob) => {
     setIsListening(true);
     try {
@@ -242,16 +290,18 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
       const { text, error } = await res.json();
       if (error) throw new Error(error);
 
-      const normalizedText = text.toLowerCase();
-      if (normalizedText.includes("listo") || normalizedText.includes("copié") || normalizedText.includes("continuar") || normalizedText.includes("ya está")) {
-        handleNext();
+      const normalizedText = (text || "").toLowerCase();
+      const keywords = ["listo", "copié", "copie", "continuar", "siguiente", "ya está", "ya esta", "ya", "ok", "okey"];
+      const matched = keywords.some(kw => normalizedText.includes(kw));
+      if (matched && !isSpeakingRef.current) {
+        handleNextRef.current();
       }
     } catch (err) {
       console.error("Error reconociendo comando:", err);
     } finally {
       setIsListening(false);
     }
-  }, [handleNext]);
+  }, []); // Sin dependencias — usa refs para acceder a valores frescos
 
   useEffect(() => {
     if (audioBlob && step === "DICTATING") {
@@ -476,30 +526,41 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
              </div>
           </div>
 
-          <div className="w-full text-center space-y-12">
-            <div className="flex flex-wrap justify-center gap-4 text-3xl font-bold leading-relaxed">
-              {phrases.map((phrase, idx) => (
-                <span 
-                  key={idx}
-                  className={`
-                    px-3 py-1 rounded-xl transition-all duration-500
-                    ${idx === currentIndex 
-                      ? "text-red-600 bg-red-50 ring-4 ring-red-200 animate-pulse scale-110" 
-                      : idx < currentIndex 
-                        ? "text-gray-300" 
-                        : "text-gray-100 select-none"
-                    }
-                  `}
-                >
-                  {config.hideText && idx === currentIndex ? (
-                    <span className="flex items-center gap-2 italic text-gray-400">
-                      <BellRing size={20} className="animate-bounce" /> Escucha con atención...
-                    </span>
-                  ) : (
-                    phrase
-                  )}
+          <div className="w-full space-y-8">
+
+            {/* === VISOR GLOBAL: HTML enriquecido (UX de copia expedita) === */}
+            {!config.hideText && initialText && /<[a-z][\s\S]*>/i.test(initialText) && (
+              <div className="bg-gray-50 border-2 border-gray-100 rounded-[2rem] p-6 overflow-y-auto max-h-64">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Texto Completo (Referencia)</p>
+                <div className="rich-viewer">
+                  {parse(initialText)}
+                </div>
+              </div>
+            )}
+
+            {/* === VISOR DE FOCO: Oración actual en grande === */}
+            <div className={`rounded-[2.5rem] p-10 border-4 text-center transition-all ${
+              isSpeaking
+                ? "bg-blue-50 border-blue-200"
+                : "bg-green-50 border-green-200"
+            }`}>
+              <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-4">
+                {isSpeaking ? "Escuchando..." : "Copia esta frase"}
+              </p>
+              {config.hideText ? (
+                <span className="flex items-center justify-center gap-3 italic text-gray-400 text-2xl">
+                  <BellRing size={28} className="animate-bounce" /> Escucha con atención...
                 </span>
-              ))}
+              ) : (
+                <p className={`text-3xl md:text-4xl font-black leading-snug transition-colors ${
+                  isSpeaking ? "text-blue-700" : "text-gray-900"
+                }`}>
+                  {phrases[currentIndex]}
+                </p>
+              )}
+              <p className="text-sm text-gray-400 font-bold mt-4">
+                Frase {currentIndex + 1} de {phrases.length}
+              </p>
             </div>
 
             <div className="pt-12 border-t border-gray-50 flex flex-col items-center gap-8">
@@ -517,9 +578,10 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
 
                     <button
                       onClick={handleNext}
-                      className="px-16 py-6 bg-green-500 text-white rounded-full font-black text-3xl shadow-2xl hover:bg-green-600 active:scale-95 transition-all flex items-center gap-4"
+                      disabled={isSpeaking}
+                      className={`px-16 py-6 rounded-full font-black text-3xl shadow-2xl transition-all flex items-center gap-4 ${isSpeaking ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-80" : "bg-green-500 text-white hover:bg-green-600 active:scale-95"}`}
                     >
-                      ¡Listo, ya copié! <CheckCircle2 size={32} />
+                      {isSpeaking ? "¿Escuchando..." : "¡Listo, ya copié!"} {!isSpeaking && <CheckCircle2 size={32} />}
                     </button>
 
                     <button

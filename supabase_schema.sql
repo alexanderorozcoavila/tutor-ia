@@ -45,7 +45,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   reason_not_done TEXT,
   metadata JSONB DEFAULT '{}'::jsonb,
   assigned_to UUID REFERENCES users(id) ON DELETE CASCADE,
-  created_by UUID REFERENCES users(id) ON DELETE SET NULL
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  supported_devices TEXT[] DEFAULT '{"desktop", "tablet", "mobile"}',
+  image_data BYTEA,
+  image_mime_type VARCHAR(50) DEFAULT 'image/webp'
 );
 
 -- 5. Tabla de Configuración Global del Sistema

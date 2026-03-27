@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
 import { TaskCreator } from "./TaskCreator";
 import { 
   CheckCircle2, Clock, BookOpen, 
   Home, Star, Settings, Plus,
-  ChevronRight, AlertCircle, Loader2, DatabaseZap
+  ChevronRight, AlertCircle, Loader2, DatabaseZap,
+  Laptop, Tablet, Smartphone, MonitorX, Camera, ImageIcon
 } from "lucide-react";
+import { useDeviceDetect } from "@/hooks/useDeviceDetect";
 
 interface Props {
   onStartTask: (task: Task) => void;
@@ -18,6 +20,11 @@ export function TaskDashboard({ onStartTask }: Props) {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [uploadingTaskId, setUploadingTaskId] = useState<string | null>(null);
+  const [previewMap, setPreviewMap] = useState<Record<string, string>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
+  const currentDevice = useDeviceDetect();
 
   const isLocalMode = typeof window !== 'undefined' && 
     (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('TU_PROJECT_ID'));
@@ -27,7 +34,6 @@ export function TaskDashboard({ onStartTask }: Props) {
     setIsLoading(true);
     try {
       const data = await taskService.getTasks();
-      // Filtrar tareas asignadas a este alumno
       setTasks(data.filter(t => t.assigned_to === user.id));
     } catch (err) {
       console.error(err);
@@ -40,6 +46,55 @@ export function TaskDashboard({ onStartTask }: Props) {
     loadTasks();
   }, [user]);
 
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>, taskId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingTaskId(taskId);
+    try {
+      // Leer como base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      // Comprimir vía API
+      let finalBase64 = base64;
+      try {
+        const res = await fetch("/api/compress-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64Image: base64 }),
+        });
+        if (res.ok) {
+          const { compressedImage } = await res.json();
+          if (compressedImage) finalBase64 = compressedImage;
+        }
+      } catch {
+        // si falla la compresión, usar original
+      }
+
+      // Actualizar preview local
+      setPreviewMap(prev => ({ ...prev, [taskId]: finalBase64 }));
+
+      // Persistir en DB
+      await taskService.updateTask(taskId, {
+        image_data: finalBase64.split(",")[1] || finalBase64,
+        image_mime_type: "image/webp",
+        metadata: {
+          evidence: finalBase64,
+        },
+      });
+    } catch (err) {
+      console.error("Error subiendo la foto:", err);
+    } finally {
+      setUploadingTaskId(null);
+      // limpiar valor del input para permitir re-seleccionar el mismo archivo
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -51,6 +106,16 @@ export function TaskDashboard({ onStartTask }: Props) {
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+      {/* Input de archivo oculto compartido */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => activeUploadId && handlePhotoSelect(e, activeUploadId)}
+      />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] shadow-xl border-2 border-indigo-50">
         <div className="flex items-center gap-6">
@@ -84,53 +149,113 @@ export function TaskDashboard({ onStartTask }: Props) {
             <p className="text-indigo-400 font-bold">No tienes aventuras pendientes por ahora.</p>
           </div>
         ) : (
-          tasks.filter(t => !['approved', 'rejected'].includes(t.status)).map((task) => (
-            <div 
-              key={task.id}
-              onClick={() => task.status === "pending" && onStartTask(task)}
-              className={`
-                group relative flex items-center justify-between p-6 rounded-[2rem] border-4 transition-all
+          tasks.filter(t => !['approved', 'rejected'].includes(t.status)).map((task) => {
+            const isSupported = !task.supported_devices || task.supported_devices.includes(currentDevice);
+            const isUploading = uploadingTaskId === task.id;
+            const canAttachPhoto = task.status !== 'pending' && !['approved', 'rejected'].includes(task.status);
+            const previewUrl = previewMap[task.id] || (task.metadata?.evidence ? `data:image/jpeg;base64,${task.metadata.evidence}` : null);
+
+            return (
+              <div key={task.id} className={`
+                group relative flex flex-col gap-0 rounded-[2rem] border-4 transition-all overflow-hidden
                 ${task.status === "completed" || task.status === "failed"
-                  ? "bg-amber-50 border-amber-100 opacity-90 cursor-default" 
-                  : "bg-white border-white shadow-lg hover:border-indigo-200 cursor-pointer active:scale-[0.98]"
+                  ? "bg-amber-50 border-amber-100 opacity-90" 
+                  : !isSupported
+                  ? "bg-gray-50 border-gray-200 opacity-60"
+                  : "bg-white border-white shadow-lg hover:border-indigo-200"
                 }
-              `}
-            >
-              <div className="flex items-center gap-6">
-                <div className={`
-                  w-16 h-16 rounded-2xl flex items-center justify-center 
-                  ${task.type === "dictation" ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600"}
-                `}>
-                  {task.type === "dictation" ? <BookOpen size={32} /> : <Home size={32} />}
-                </div>
-                <div>
-                  <h3 className={`text-xl font-black ${task.status === "completed" ? "text-amber-700" : "text-gray-900"}`}>
-                    {task.title}
-                  </h3>
-                  <div className="flex items-center gap-4 text-sm font-bold mt-1 text-gray-400">
-                    <span className="uppercase tracking-widest">{task.type === "dictation" ? "Dictado" : "Hogar"}</span>
-                    {(task.status === "completed" || task.status === "failed") && (
-                      <span className="flex items-center gap-1 text-amber-500 bg-amber-100 px-3 py-1 rounded-full text-xs">
-                        <Clock size={12} /> ESPERANDO REVISIÓN
-                      </span>
+              `}>
+                {/* Fila principal de la tarea */}
+                <div
+                  onClick={() => task.status === "pending" && isSupported && onStartTask(task)}
+                  className={`flex items-center justify-between p-6 ${task.status === "pending" && isSupported ? "cursor-pointer active:scale-[0.98]" : "cursor-default"}`}
+                >
+                  <div className="flex items-center gap-6">
+                    <div className={`
+                      w-16 h-16 rounded-2xl flex items-center justify-center 
+                      ${!isSupported ? "bg-gray-200 text-gray-400" : task.type === "dictation" ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600"}
+                    `}>
+                      {task.type === "dictation" ? <BookOpen size={32} /> : <Home size={32} />}
+                    </div>
+                    <div>
+                      <h3 className={`text-xl font-black ${task.status === "completed" ? "text-amber-700" : !isSupported ? "text-gray-500" : "text-gray-900"}`}>
+                        {task.title}
+                      </h3>
+                      <div className="flex items-center gap-4 text-sm font-bold mt-1 text-gray-400">
+                        <span className="uppercase tracking-widest">{task.type === "dictation" ? "Dictado" : "Hogar"}</span>
+                        {!isSupported && (
+                          <span className="flex items-center gap-1 text-red-500 bg-red-50 px-3 py-1 rounded-full text-[10px] uppercase">
+                            <MonitorX size={12} /> Bloqueado aquí
+                          </span>
+                        )}
+                        {(task.status === "completed" || task.status === "failed") && (
+                          <span className="flex items-center gap-1 text-amber-500 bg-amber-100 px-3 py-1 rounded-full text-xs">
+                            <Clock size={12} /> ESPERANDO REVISIÓN
+                          </span>
+                        )}
+                        <div className="flex items-center gap-1 ml-2 opacity-50" title="Dispositivos compatibles">
+                          {(!task.supported_devices || task.supported_devices.includes('desktop')) && <Laptop size={14} />}
+                          {(!task.supported_devices || task.supported_devices.includes('tablet')) && <Tablet size={14} />}
+                          {(!task.supported_devices || task.supported_devices.includes('mobile')) && <Smartphone size={14} />}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    {task.status === "pending" ? (
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${!isSupported ? "bg-gray-100 text-gray-300" : "bg-indigo-50 text-indigo-500 group-hover:bg-indigo-500 group-hover:text-white"}`}>
+                        <ChevronRight size={28} />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center">
+                        <AlertCircle size={24} />
+                      </div>
                     )}
                   </div>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-4">
-                {task.status === "pending" ? (
-                  <div className="w-12 h-12 bg-indigo-50 text-indigo-500 rounded-full flex items-center justify-center group-hover:bg-indigo-500 group-hover:text-white transition-all">
-                    <ChevronRight size={28} />
-                  </div>
-                ) : (
-                  <div className="w-12 h-12 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center">
-                    <AlertCircle size={24} />
+                {/* Sección de foto de evidencia (solo en tareas completadas/failed, no aprobadas/rechazadas) */}
+                {canAttachPhoto && (
+                  <div className="px-6 pb-6 border-t-2 border-amber-100 pt-4">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                      <ImageIcon size={12} /> Foto de evidencia
+                    </p>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      {/* Minuatura de la foto si existe */}
+                      {previewUrl && (
+                        <div className="w-20 h-20 rounded-xl overflow-hidden border-2 border-white shadow-md shrink-0">
+                          <img src={previewUrl} alt="Evidencia" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+                      {/* Botón de cámara */}
+                      <button
+                        type="button"
+                        disabled={isUploading}
+                        onClick={() => {
+                          setActiveUploadId(task.id);
+                          // Pequeño timeout para que el state se actualice antes del click
+                          setTimeout(() => fileInputRef.current?.click(), 0);
+                        }}
+                        className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 ${
+                          previewUrl
+                            ? "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            : "bg-indigo-500 text-white hover:bg-indigo-600 shadow-md"
+                        }`}
+                      >
+                        {isUploading ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <Camera size={18} />
+                        )}
+                        {isUploading ? "Subiendo..." : previewUrl ? "Cambiar foto" : "Agregar foto"}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

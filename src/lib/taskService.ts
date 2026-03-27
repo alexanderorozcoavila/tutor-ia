@@ -14,6 +14,9 @@ export interface Task {
   reason_not_done?: string;
   assigned_to?: string;
   created_by?: string;
+  supported_devices?: string[];
+  image_data?: string;
+  image_mime_type?: string;
   metadata: {
     dictation_text?: string;
     reading_text?: string;
@@ -105,5 +108,15 @@ export const taskService = {
     
     if (error) throw error;
     return data[0] as Task;
+  },
+
+  async deleteTask(id: string) {
+    if (!isSupabaseConfigured) {
+      const tasks = getLocalTasks();
+      saveLocalTasks(tasks.filter(t => t.id !== id));
+      return;
+    }
+    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    if (error) throw error;
   }
 };

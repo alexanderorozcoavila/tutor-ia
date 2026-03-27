@@ -29,6 +29,8 @@ export function TutorDashboard() {
   const [taskToReview, setTaskToReview] = useState<Task | null>(null);
   const [reviewScore, setReviewScore] = useState(100);
   const [showScoreModal, setShowScoreModal] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false);
 
   // Estados para modales de gestión
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -168,6 +170,22 @@ export function TutorDashboard() {
         status === "rejected" ? "Tarea rechazada" : "Tarea reabierta para el alumno",
         { type: "success" }
       );
+    } catch (err: any) {
+      showAlert(err.message, { type: "error" });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleDeleteTask = async () => {
+    if (!taskToDelete) return;
+    setIsActionLoading(true);
+    try {
+      await taskService.deleteTask(taskToDelete.id);
+      setShowDeleteTaskModal(false);
+      setTaskToDelete(null);
+      if (selectedStudent) loadStudentTasks(selectedStudent.id);
+      showAlert("Tarea eliminada", { type: "success" });
     } catch (err: any) {
       showAlert(err.message, { type: "error" });
     } finally {
@@ -318,6 +336,13 @@ export function TutorDashboard() {
                                   En Progreso
                                 </span>
                               )}
+                              <button
+                                onClick={() => { setTaskToDelete(t); setShowDeleteTaskModal(true); }}
+                                title="Eliminar tarea"
+                                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                              >
+                                <Trash2 size={16} />
+                              </button>
                             </div>
                           </div>
 
@@ -534,6 +559,38 @@ export function TutorDashboard() {
           </div>
         </div>
       )}
+
+      {/* Modal confirmar eliminar tarea */}
+      <Modal
+        isOpen={showDeleteTaskModal}
+        onClose={() => { setShowDeleteTaskModal(false); setTaskToDelete(null); }}
+        title="Eliminar Tarea"
+      >
+        <div className="space-y-6 text-center">
+          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto">
+            <Trash2 size={40} />
+          </div>
+          <div>
+            <p className="text-xl font-black text-gray-900">¿Eliminar esta tarea?</p>
+            <p className="text-gray-500 font-bold mt-1">Se eliminará <span className="text-red-600">«{taskToDelete?.title}»</span> y no podrá recuperarse.</p>
+          </div>
+          <div className="flex gap-4">
+            <button
+              onClick={() => { setShowDeleteTaskModal(false); setTaskToDelete(null); }}
+              className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-xl font-black hover:bg-gray-200 transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleDeleteTask}
+              disabled={isActionLoading}
+              className="flex-1 py-4 bg-red-500 text-white rounded-xl font-black shadow-lg hover:bg-red-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isActionLoading ? <Loader2 className="animate-spin" /> : "Sí, Eliminar"}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Modales de Gestión de Alumno */}
       <Modal 

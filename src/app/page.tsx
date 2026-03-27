@@ -17,6 +17,12 @@ function AppContent() {
   const { user, logout, isLoading } = useAuth();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
 
+  // Bug fix: limpiar la tarea activa cuando cambia el usuario (logout/login)
+  // Sin esto, al cambiar de rol queda activa la vista del módulo anterior
+  useEffect(() => {
+    setActiveTask(null);
+  }, [user?.id]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">

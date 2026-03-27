@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { taskService, TaskType } from "@/lib/taskService";
-import { Plus, BookOpen, Home, Save, X, BookA } from "lucide-react";
+import { Plus, BookOpen, Home, Save, X, BookA, Laptop, Tablet, Smartphone } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
+import { RichTextEditor } from "@/components/RichTextEditor";
 
 interface Props {
   studentId?: string;
@@ -16,7 +17,7 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   const [type, setType] = useState<TaskType>("dictation");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [dictationText, setDictationText] = useState("");
+  const [dictationText, setDictationText] = useState(""); // Guardará HTML del editor
   const [mode, setMode] = useState<"LIBRE" | "TEMPORIZADOR">("TEMPORIZADOR");
   const [timeLimit, setTimeLimit] = useState(30);
   const [alertInterval, setAlertInterval] = useState(10);
@@ -24,7 +25,15 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   const [hideText, setHideText] = useState(false);
   const [readingLevel, setReadingLevel] = useState<number>(1);
   const [readingText, setReadingText] = useState("");
+  const [supportedDevices, setSupportedDevices] = useState<string[]>(['desktop', 'tablet', 'mobile']);
   const [isSaving, setIsSaving] = useState(false);
+
+  const toggleDevice = (dev: string) => {
+    setSupportedDevices(prev => {
+      if (prev.includes(dev) && prev.length === 1) return prev; // Siempre debe haber al menos uno
+      return prev.includes(dev) ? prev.filter(d => d !== dev) : [...prev, dev];
+    });
+  };
 
   const READING_LEVELS: Record<number, string> = {
     1: "ma me mi mo mu. pa pe pi po pu.",
@@ -69,6 +78,7 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
         description,
         type,
         assigned_to: studentId,
+        supported_devices: supportedDevices,
         metadata,
       });
       onTaskCreated();
@@ -81,7 +91,7 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   };
 
   return (
-    <div className="w-full max-w-2xl bg-white rounded-[2.5rem] p-8 shadow-2xl border-4 border-indigo-50 animate-in zoom-in-95 duration-300">
+    <div className="w-full max-w-2xl md:max-w-[90vw] bg-white rounded-[2.5rem] p-8 shadow-2xl border-4 border-indigo-50 animate-in zoom-in-95 duration-300">
       <div className="flex justify-between items-center mb-8">
         <h2 className="text-3xl font-black text-gray-900">Nueva Actividad</h2>
         <button onClick={onCancel} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
@@ -133,15 +143,41 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
           />
         </div>
 
+        <div className="space-y-3">
+          <label className="text-sm font-black text-gray-400 uppercase tracking-wider">Dispositivos Permitidos</label>
+          <div className="flex gap-4">
+            <button
+              type="button"
+              onClick={() => toggleDevice('desktop')}
+              className={`flex-1 py-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold transition-all ${supportedDevices.includes('desktop') ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}
+            >
+              <Laptop size={20} /> PC
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleDevice('tablet')}
+              className={`flex-1 py-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold transition-all ${supportedDevices.includes('tablet') ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}
+            >
+              <Tablet size={20} /> Tablet
+            </button>
+            <button
+              type="button"
+              onClick={() => toggleDevice('mobile')}
+              className={`flex-1 py-3 rounded-2xl border-2 flex items-center justify-center gap-2 font-bold transition-all ${supportedDevices.includes('mobile') ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}
+            >
+              <Smartphone size={20} /> Móvil
+            </button>
+          </div>
+        </div>
+
         {type === "dictation" && (
           <div className="space-y-6 animate-in slide-in-from-top-2 bg-indigo-50/30 p-6 rounded-[2rem] border-2 border-indigo-100">
             <div className="space-y-2">
               <label className="text-sm font-black text-gray-400 uppercase tracking-wider">Texto para dictar</label>
-              <textarea
-                value={dictationText}
-                onChange={(e) => setDictationText(e.target.value)}
-                placeholder="Escribe aquí el texto que el tutor leerá..."
-                className="w-full p-4 rounded-2xl border-2 border-indigo-100 bg-white focus:border-indigo-300 focus:outline-none transition-all h-24 resize-none font-medium"
+              <RichTextEditor
+                content={dictationText}
+                onChange={setDictationText}
+                placeholder="Escribe aquí el texto que el alumno leerá y transcribirá..."
               />
             </div>
 
