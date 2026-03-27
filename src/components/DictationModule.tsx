@@ -8,7 +8,7 @@ import { settingsService } from "@/lib/settingsService";
 import { ImageCapture } from "@/components/ImageCapture";
 import { PhraseToast } from "@/components/PhraseToast";
 import {
-  Loader2, BookOpen, PenTool, ArrowRight,
+  Loader2,
   CheckCircle2, Timer, RefreshCcw, Settings,
   Play, BellRing
 } from "lucide-react";
@@ -45,10 +45,10 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
     return saved ? parseInt(saved, 10) : 0;
   })();
 
-  const [step, setStep] = useState<"INPUT" | "PROCESSING" | "CONFIG" | "DICTATING" | "CAPTURING_EVIDENCE" | "FINISHED">(
-    initialText ? (initialConfig ? "DICTATING" : "CONFIG") : "INPUT"
+  const [step, setStep] = useState<"PROCESSING" | "CONFIG" | "DICTATING" | "CAPTURING_EVIDENCE" | "FINISHED">(
+    initialConfig ? "DICTATING" : "DICTATING"
   );
-  const [inputText, setInputText] = useState(initialText || "");
+
   const [phrases, setPhrases] = useState<string[]>([]);
   // Si venimos en modo reanudación (initialText + initialConfig), arrancamos desde el índice guardado
   const [currentIndex, setCurrentIndex] = useState(initialText && initialConfig ? savedIndexOnMount : 0);
@@ -208,26 +208,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
     }
   }, [initialText]);
 
-  const handleImageReady = async (base64: string) => {
-    setIsProcessing(true);
-    setStep("PROCESSING");
-    try {
-      const res = await fetch("/api/extract-text", {
-        method: "POST",
-        body: JSON.stringify({ base64Image: base64 }),
-      });
-      const { text, error } = await res.json();
-      if (error) throw new Error(error);
-      setInputText(text);
-      processPhrases(text);
-    } catch (err) {
-      console.error(err);
-      globalAlert("No pude leer bien la imagen. ¿Podrías intentar de nuevo o escribir el texto?", { type: "error" });
-      setStep("INPUT");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+
 
   const startDictation = () => {
     // unlock() desbloquea el motor TTS con un utterance silencioso (zero-width space).
@@ -455,54 +436,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
     }
   };
 
-  if (step === "INPUT") {
-    return (
-      <div className="w-full max-w-4xl mx-auto p-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="bg-white rounded-[3rem] p-12 shadow-2xl border-4 border-dashed border-indigo-100 flex flex-col items-center gap-10">
-          <div className="w-24 h-24 bg-indigo-50 rounded-3xl flex items-center justify-center text-indigo-500">
-            <BookOpen size={48} />
-          </div>
-          <div className="text-center">
-            <h1 className="text-4xl font-black text-gray-900 mb-4">¿Qué vamos a dictar hoy?</h1>
-            <p className="text-gray-500 text-lg">Escribe el texto o toma una foto de tu libro favorito.</p>
-          </div>
 
-          <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-8 mt-4">
-            {/* Opción Imagen */}
-            <div className="bg-indigo-50/50 p-8 rounded-[2rem] border-2 border-transparent hover:border-indigo-200 transition-all flex flex-col items-center gap-6 group">
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                <PenTool className="text-indigo-500" />
-              </div>
-              <h3 className="text-xl font-bold text-indigo-900">Desde una imagen</h3>
-              <p className="text-sm text-indigo-400 text-center">IA leerá el texto por ti.</p>
-              <ImageCapture onImageReady={handleImageReady} label="Subir foto del libro" />
-            </div>
-
-            {/* Opción Texto */}
-            <div className="bg-emerald-50/50 p-8 rounded-[2rem] border-2 border-transparent hover:border-emerald-200 transition-all flex flex-col items-center gap-6 group">
-              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center shadow-sm group-hover:scale-110 transition-transform">
-                <BookOpen className="text-emerald-500" />
-              </div>
-              <h3 className="text-xl font-bold text-emerald-900">Escribir texto</h3>
-              <textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder="Escribe aquí las palabras..."
-                className="w-full h-24 p-4 rounded-xl border-2 border-emerald-100 focus:border-emerald-300 focus:outline-none text-gray-700 resize-none bg-white"
-              />
-              <button
-                disabled={!inputText.trim()}
-                onClick={() => processPhrases(inputText)}
-                className="w-full py-4 bg-emerald-500 text-white rounded-full font-bold shadow-lg hover:bg-emerald-600 active:scale-95 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-              >
-                Continuar <ArrowRight size={20} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   if (step === "PROCESSING") {
     return (
@@ -752,7 +686,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
             if (onFinish) {
               onFinish();
             } else {
-              setStep("INPUT");
+              setStep("CONFIG");
               setEvaluationFeedback(null);
             }
           }}
