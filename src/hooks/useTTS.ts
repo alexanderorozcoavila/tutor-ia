@@ -12,20 +12,36 @@ export function useTTS(options: TTSOptions = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const resumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Guardamos el utterance pendiente para poder cancelarlo limpiamente
+  const pendingUtterRef = useRef<SpeechSynthesisUtterance | null>(null);
 
-  // Limpiar interval de keep-alive al desmontar
+  // Limpiar al desmontar
   useEffect(() => {
     return () => {
       if (resumeIntervalRef.current) clearInterval(resumeIntervalRef.current);
+      window.speechSynthesis?.cancel();
     };
   }, []);
 
-  // Cargar voces
+  // Cargar voces — el evento onvoiceschanged es necesario en Chrome
   useEffect(() => {
-    const handleVoicesChanged = () => setVoices(window.speechSynthesis.getVoices());
-    setVoices(window.speechSynthesis.getVoices());
-    window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
+    const load = () => setVoices(window.speechSynthesis.getVoices());
+    load();
+    window.speechSynthesis.onvoiceschanged = load;
     return () => { window.speechSynthesis.onvoiceschanged = null; };
+  }, []);
+
+  /**
+   * unlock() — debe llamarse desde un handler de click del usuario.
+   * Ejecuta un cancel() para "despertar" el motor de síntesis sin encolar
+   * ningún utterance que pueda interferir con la primera frase real.
+   * No usa speak() silencioso porque eso crea una race condition.
+   */
+  const unlock = useCallback(() => {
+    if (!("speechSynthesis" in window)) return;
+    // Un cancel() desde un gesto de usuario desbloquea el motor en Chrome/Safari
+    // sin necesidad de encolar nada extra.
+    window.speechSynthesis.cancel();
   }, []);
 
   const speak = useCallback(
@@ -35,14 +51,20 @@ export function useTTS(options: TTSOptions = {}) {
         return;
       }
 
-      // Limpiar interval previo y cancelar audio en curso
+      // Detener keep-alive previo
       if (resumeIntervalRef.current) {
         clearInterval(resumeIntervalRef.current);
         resumeIntervalRef.current = null;
       }
+
+      // Cancelar cualquier audio en curso
       window.speechSynthesis.cancel();
 
+      // Si no hay texto real, salir (evita encolar utterances vacíos)
+      if (!text || !text.trim()) return;
+
       const utterance = new SpeechSynthesisUtterance(text);
+      pendingUtterRef.current = utterance;
 
       let currentVoices = voices;
       if (currentVoices.length === 0) currentVoices = window.speechSynthesis.getVoices();
@@ -78,7 +100,6 @@ export function useTTS(options: TTSOptions = {}) {
       utterance.onend = () => { clearKeepAlive(); setIsSpeaking(false); };
       utterance.onerror = (e) => {
         clearKeepAlive();
-        // 'interrupted' y 'canceled' son esperados cuando llamamos cancel() intencionalmente
         if (e.error !== "interrupted" && e.error !== "canceled") {
           console.error("Error en TTS:", e.error);
         }
@@ -111,5 +132,5 @@ export function useTTS(options: TTSOptions = {}) {
     }
   }, []);
 
-  return { speak, stop, isSpeaking };
+  return { speak, stop, isSpeaking, unlock };
 }

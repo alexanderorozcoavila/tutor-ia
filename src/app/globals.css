@@ -105,3 +105,20 @@ body {
 .rich-viewer img { max-width: 100%; border-radius: 1rem; margin: 0.5rem 0; }
 .rich-viewer strong { font-weight: 700; }
 
+/* === Phrase Highlight (DictationModule auto-scroll) === */
+.phrase-span {
+  border-radius: 4px;
+  padding: 0 2px;
+  transition: background-color 0.35s ease, font-weight 0.2s ease;
+}
+.phrase-active {
+  background-color: #fef08a; /* yellow-200 */
+  font-weight: 700;
+  box-shadow: 0 0 0 2px #fde047; /* yellow-300 ring */
+}
+
+/* === PhraseToast shrink animation (10s timer bar) === */
+@keyframes phrase-toast-shrink {
+  from { width: 100%; }
+  to   { width: 0%;   }
+}
