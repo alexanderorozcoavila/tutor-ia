@@ -10,9 +10,32 @@ import {
   Users, UserPlus, BookOpen, Home, 
   ChevronRight, Plus, Calendar, GraduationCap,
   Clock, Bell, Settings2, Loader2, X, Trash2, AlertTriangle, 
-  Star, DatabaseZap, CheckCircle2
+  Star, DatabaseZap, CheckCircle2, Image as ImageIcon
 } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
+
+const AsyncImageWithSkeleton = ({ src, alt, className }: { src: string, alt: string, className?: string }) => {
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  return (
+    <div className={`relative bg-gray-100 overflow-hidden ${className}`}>
+      {!isLoaded && (
+        <div className="absolute inset-0 animate-pulse bg-indigo-50 flex items-center justify-center">
+          <ImageIcon className="text-indigo-200" size={24} />
+        </div>
+      )}
+      <img
+        src={src}
+        alt={alt}
+        loading="lazy"
+        onLoad={() => setIsLoaded(true)}
+        className={`w-full h-full object-cover transition-opacity duration-700 ${
+          isLoaded ? 'opacity-100' : 'opacity-0'
+        }`}
+      />
+    </div>
+  );
+};
 
 export function TutorDashboard() {
   const { showAlert } = useAlert();
@@ -360,7 +383,7 @@ export function TutorDashboard() {
                                     onClick={() => setSelectedEvidence(t.metadata.evidence)}
                                     className="relative w-32 aspect-video rounded-lg overflow-hidden border-2 border-white cursor-zoom-in shadow-sm"
                                   >
-                                    <img src={t.metadata.evidence} alt="Evidencia" className="w-full h-full object-cover" />
+                                    <AsyncImageWithSkeleton src={t.metadata.evidence} alt="Evidencia" className="w-full h-full" />
                                   </div>
                                 </div>
                               )}

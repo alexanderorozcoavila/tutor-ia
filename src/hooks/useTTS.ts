@@ -6,12 +6,15 @@ interface TTSOptions {
   pitch?: number;
   rate?: number;
   lang?: string;
+  cooldownMs?: number; // Agregado para soportar candado antirrebote
 }
 
 export function useTTS(options: TTSOptions = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const resumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guardamos el utterance pendiente para poder cancelarlo limpiamente
   const pendingUtterRef = useRef<SpeechSynthesisUtterance | null>(null);
 
@@ -51,17 +54,24 @@ export function useTTS(options: TTSOptions = {}) {
         return;
       }
 
-      // Detener keep-alive previo
+      // Detener keep-alive y cooldown previo
       if (resumeIntervalRef.current) {
         clearInterval(resumeIntervalRef.current);
         resumeIntervalRef.current = null;
+      }
+      if (cooldownTimerRef.current) {
+        clearTimeout(cooldownTimerRef.current);
+        cooldownTimerRef.current = null;
       }
 
       // Cancelar cualquier audio en curso
       window.speechSynthesis.cancel();
 
       // Si no hay texto real, salir (evita encolar utterances vacíos)
-      if (!text || !text.trim()) return;
+      if (!text || !text.trim()) {
+        setIsLocked(false);
+        return;
+      }
 
       const utterance = new SpeechSynthesisUtterance(text);
       pendingUtterRef.current = utterance;
@@ -96,14 +106,28 @@ export function useTTS(options: TTSOptions = {}) {
         }
       };
 
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => { clearKeepAlive(); setIsSpeaking(false); };
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        setIsLocked(true);
+      };
+      
+      utterance.onend = () => { 
+        clearKeepAlive(); 
+        setIsSpeaking(false); 
+        // Iniciar Candado Anti-Rebote (Cooldown)
+        const cooldown = options.cooldownMs ?? 2000;
+        cooldownTimerRef.current = setTimeout(() => {
+          setIsLocked(false);
+        }, cooldown);
+      };
+      
       utterance.onerror = (e) => {
         clearKeepAlive();
         if (e.error !== "interrupted" && e.error !== "canceled") {
           console.error("Error en TTS:", e.error);
         }
         setIsSpeaking(false);
+        setIsLocked(false);
       };
 
       // Keep-alive para Chrome (evita pausas automáticas en frases largas)
@@ -126,11 +150,16 @@ export function useTTS(options: TTSOptions = {}) {
       clearInterval(resumeIntervalRef.current);
       resumeIntervalRef.current = null;
     }
+    if (cooldownTimerRef.current) {
+      clearTimeout(cooldownTimerRef.current);
+      cooldownTimerRef.current = null;
+    }
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      setIsLocked(false);
     }
   }, []);
 
-  return { speak, stop, isSpeaking, unlock };
+  return { speak, stop, isSpeaking, isLocked, unlock };
 }

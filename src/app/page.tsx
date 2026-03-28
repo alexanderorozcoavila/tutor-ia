@@ -9,6 +9,7 @@ import { TaskDashboard } from "@/components/TaskDashboard";
 import { DictationModule } from "@/components/DictationModule";
 import { DomesticTaskModule } from "@/components/DomesticTaskModule";
 import { ReadingModule } from "@/components/ReadingModule";
+import { AssessmentModule } from "@/components/AssessmentModule";
 import { FullScreenWrapper } from "@/components/FullScreenWrapper";
 import { Task } from "@/lib/taskService";
 import { LogOut, Sparkles } from "lucide-react";
@@ -54,6 +55,14 @@ function AppContent() {
       if (activeTask.type === "reading") {
         return (
           <ReadingModule 
+            task={activeTask}
+            onFinish={() => setActiveTask(null)}
+          />
+        );
+      }
+      if (activeTask.type === "assessment") {
+        return (
+          <AssessmentModule 
             task={activeTask}
             onFinish={() => setActiveTask(null)}
           />

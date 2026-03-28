@@ -1,7 +1,15 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
-export type TaskType = 'dictation' | 'domestic' | 'reading';
+export type TaskType = 'dictation' | 'domestic' | 'reading' | 'assessment';
 export type TaskStatus = 'pending' | 'completed' | 'failed' | 'approved' | 'rejected';
+
+export interface AssessmentQuestion {
+  id: string;
+  text: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
 
 export interface Task {
   id: string;
@@ -15,12 +23,13 @@ export interface Task {
   assigned_to?: string;
   created_by?: string;
   supported_devices?: string[];
-  image_data?: string;
-  image_mime_type?: string;
+  image_url?: string;
   metadata: {
     dictation_text?: string;
     reading_text?: string;
     reading_level?: number;
+    questions?: AssessmentQuestion[];
+    assessment_time_limit?: number; // 0 o undefined = sin limite
     config?: {
       mode: 'LIBRE' | 'TEMPORIZADOR';
       timeLimit: number;

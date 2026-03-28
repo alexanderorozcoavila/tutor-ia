@@ -80,8 +80,7 @@ export function TaskDashboard({ onStartTask }: Props) {
 
       // Persistir en DB
       await taskService.updateTask(taskId, {
-        image_data: finalBase64.split(",")[1] || finalBase64,
-        image_mime_type: "image/webp",
+        image_url: finalBase64.split(",")[1] || finalBase64,
         metadata: {
           evidence: finalBase64,
         },

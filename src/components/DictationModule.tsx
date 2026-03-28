@@ -68,7 +68,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
     hideText: false,
   });
 
-  const { speak, isSpeaking, stop: stopTTS, unlock } = useTTS();
+  const { speak, isSpeaking, isLocked, stop: stopTTS, unlock } = useTTS({ cooldownMs: 2000 });
   const { isRecording, startRecording, stopRecording, audioBlob } = useAudioRecorder();
   const alertTimerRef = useRef<number>(0);
 
@@ -186,14 +186,33 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
     const plainText = isHtml ? htmlToPlainText(input) : input;
     const cleanText = plainText.trim();
 
-    // Regex estricto: divide por signos de final de oración (. ! ? y saltos de línea).
-    // Las comas NO se usan para segmentar; el TTS las maneja de forma natural.
-    const parts = cleanText.split(/(?<=[.!?])\s+|\n+/);
+    // Regex estricto: divide por signos de final de oración y pausas gramaticales.
+    const grammarTokens = cleanText.split(/(?<=[.,;:!?”])\s+|\n+/);
 
     const finalPhrases: string[] = [];
-    parts.forEach(part => {
-      const trimmed = part.trim();
-      if (trimmed) finalPhrases.push(trimmed);
+
+    grammarTokens.forEach(token => {
+      const trimmed = token.trim();
+      if (!trimmed) return;
+
+      const words = trimmed.split(' ');
+
+      // Segmentación estricta: Fragmentos de no más de 8 palabras
+      if (words.length > 8) {
+        let currentChunk: string[] = [];
+        words.forEach(word => {
+          currentChunk.push(word);
+          if (currentChunk.length === 8) {
+            finalPhrases.push(currentChunk.join(' '));
+            currentChunk = [];
+          }
+        });
+        if (currentChunk.length > 0) {
+          finalPhrases.push(currentChunk.join(' '));
+        }
+      } else {
+        finalPhrases.push(trimmed);
+      }
     });
 
     setPhrases(finalPhrases);
@@ -343,9 +362,8 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
         await taskService.updateTask(taskId, {
           status: "completed",
           score: 100,
-          // Guardar base64 puro en la nueva columna BYTEA
-          image_data: finalBase64.split(",")[1] || finalBase64,
-          image_mime_type: 'image/webp',
+          // Guardar url / base64 en la nueva columna de bucket
+          image_url: finalBase64.split(",")[1] || finalBase64,
           metadata: {
             ...initialConfig, // Mantener config original
             dictation_text: initialText
@@ -375,7 +393,8 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   // Listener para la tecla Espacio — blureamos el elemento activo para que window reciba el evento
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (step === "DICTATING" && !isSpeaking && e.code === "Space") {
+      // Usar isLocked para candado anti-rebote integral (Audio + 2s cooldown)
+      if (step === "DICTATING" && !isLocked && e.code === "Space") {
         e.preventDefault();
         // Devolver el foco al documento aunque se haya clickeado un botón
         if (document.activeElement instanceof HTMLElement) {
@@ -390,9 +409,9 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
 
   // Refs para acceder al estado actualizado en handleVoiceCommand sin stale closures
   const handleNextRef = useRef(handleNext);
-  const isSpeakingRef = useRef(isSpeaking);
+  const isLockedRef = useRef(isLocked);
   useEffect(() => { handleNextRef.current = handleNext; }, [handleNext]);
-  useEffect(() => { isSpeakingRef.current = isSpeaking; }, [isSpeaking]);
+  useEffect(() => { isLockedRef.current = isLocked; }, [isLocked]);
 
   // Lógica de Reconocimiento de Voz para el comando "¡Listo, ya copié!"
   // Usa refs para evitar stale closures sobre isSpeaking y handleNext
@@ -408,7 +427,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
       const normalizedText = (text || "").toLowerCase();
       const keywords = ["listo", "copié", "copie", "continuar", "siguiente", "ya está", "ya esta", "ya", "ok", "okey"];
       const matched = keywords.some(kw => normalizedText.includes(kw));
-      if (matched && !isSpeakingRef.current) {
+      if (matched && !isLockedRef.current) {
         handleNextRef.current();
       }
     } catch (err) {
@@ -623,10 +642,10 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
 
                   <button
                     onClick={handleNext}
-                    disabled={isSpeaking}
-                    className={`px-16 py-6 rounded-full font-black text-3xl shadow-2xl transition-all flex items-center gap-4 ${isSpeaking ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-80" : "bg-green-500 text-white hover:bg-green-600 active:scale-95"}`}
+                    disabled={isLocked}
+                    className={`px-16 py-6 rounded-full font-black text-3xl shadow-2xl transition-all flex items-center gap-4 ${isLocked ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-80" : "bg-green-500 text-white hover:bg-green-600 active:scale-95"}`}
                   >
-                    {isSpeaking ? "Escuchando..." : "¡Listo, ya copié!"} {!isSpeaking && <CheckCircle2 size={32} />}
+                    {isSpeaking ? "Escuchando..." : isLocked ? "Espera..." : "¡Listo, ya copié!"} {!isLocked && <CheckCircle2 size={32} />}
                   </button>
 
                   <button

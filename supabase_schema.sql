@@ -13,6 +13,10 @@ DO $$ BEGIN
 EXCEPTION WHEN OTHERS THEN null; END $$;
 
 DO $$ BEGIN
+    ALTER TYPE task_type ADD VALUE IF NOT EXISTS 'assessment';
+EXCEPTION WHEN OTHERS THEN null; END $$;
+
+DO $$ BEGIN
     CREATE TYPE task_status AS ENUM ('pending', 'completed', 'approved', 'rejected');
 EXCEPTION WHEN duplicate_object THEN null; END $$;
 
@@ -58,23 +62,59 @@ CREATE TABLE IF NOT EXISTS system_settings (
   CONSTRAINT one_row CHECK (id)
 );
 
--- 6. Habilitar RLS (Row Level Security)
+-- 6. Tabla de Sesiones (Persistencia y Antirrebote)
+CREATE TABLE IF NOT EXISTS task_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  current_index INTEGER DEFAULT 0,
+  status task_status DEFAULT 'pending',
+  updated_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE(task_id, student_id)
+);
+
+-- 7. Evaluaciones Impulsadas por IA
+CREATE TABLE IF NOT EXISTS assessments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  time_limit_seconds INTEGER DEFAULT 0,
+  questions JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 8. Resultados de la Evaluación (Wizard UI)
+CREATE TABLE IF NOT EXISTS assessment_submissions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  assessment_id UUID NOT NULL REFERENCES assessments(id) ON DELETE CASCADE,
+  student_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  score DECIMAL(3,1) CHECK (score >= 1.0 AND score <= 7.0),
+  answers JSONB,
+  completed_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 9. Habilitar RLS (Row Level Security)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tutor_students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE task_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assessment_submissions ENABLE ROW LEVEL SECURITY;
 
--- 7. Políticas de Acceso (MVP: Permitir todo por simplicidad en demo)
+-- 10. Políticas de Acceso (MVP: Permitir todo por simplicidad en demo)
 -- Nota: En producción real, estas políticas deben ser más restrictivas.
 CREATE POLICY "Permitir todo a usuarios" ON users FOR ALL USING (true);
 CREATE POLICY "Permitir todo en tareas" ON tasks FOR ALL USING (true);
 CREATE POLICY "Permitir todo en relaciones" ON tutor_students FOR ALL USING (true);
 CREATE POLICY "Permitir todo en ajustes" ON system_settings FOR ALL USING (true);
+CREATE POLICY "Permitir todo en sesiones" ON task_sessions FOR ALL USING (true);
+CREATE POLICY "Permitir todo en evaluaciones" ON assessments FOR ALL USING (true);
+CREATE POLICY "Permitir todo en resultados" ON assessment_submissions FOR ALL USING (true);
 
--- 8. Insertar usuario admin inicial (opcional, el código lo crea si no existe)
+-- 11. Insertar usuario admin inicial (opcional, el código lo crea si no existe)
 -- INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin');
 
--- 9. Insertar ajustes por defecto
+-- 12. Insertar ajustes por defecto
 INSERT INTO system_settings (attention_message) 
 VALUES ('¡Hola! ¿Cómo vas? Sigamos juntos.')
 ON CONFLICT (id) DO NOTHING;
