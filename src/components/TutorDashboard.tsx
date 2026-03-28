@@ -5,12 +5,13 @@ import { User, userService } from "@/lib/userService";
 import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
 import { TaskCreator } from "./TaskCreator";
+import { GlobalAssessmentBank } from "./GlobalAssessmentBank";
 import { Modal } from "./Modal";
 import { 
   Users, UserPlus, BookOpen, Home, 
   ChevronRight, Plus, Calendar, GraduationCap,
   Clock, Bell, Settings2, Loader2, X, Trash2, AlertTriangle, 
-  Star, DatabaseZap, CheckCircle2, Image as ImageIcon
+  Star, DatabaseZap, CheckCircle2, Image as ImageIcon, BookA
 } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
 
@@ -40,6 +41,8 @@ const AsyncImageWithSkeleton = ({ src, alt, className }: { src: string, alt: str
 export function TutorDashboard() {
   const { showAlert } = useAlert();
   const { user: tutor } = useAuth();
+  
+  const [mainTab, setMainTab] = useState<"mis_alumnos" | "banco">("mis_alumnos");
   const [students, setStudents] = useState<User[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
   const [showUserCreator, setShowUserCreator] = useState(false);
@@ -246,8 +249,27 @@ export function TutorDashboard() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Lista de Alumnos */}
+      {/* Navegación Principal del Tutor */}
+      <div className="flex bg-gray-100 p-2 rounded-[2rem] border-4 border-gray-50 shadow-inner">
+        <button
+          onClick={() => setMainTab("mis_alumnos")}
+          className={`flex-1 flex flex-col items-center justify-center p-4 rounded-[1.5rem] font-black uppercase tracking-widest transition-all ${mainTab === "mis_alumnos" ? "bg-white text-indigo-700 shadow-md" : "text-gray-400 hover:bg-gray-200"}`}
+        >
+          <GraduationCap size={24} className="mb-2" /> Mis Alumnos
+        </button>
+        <button
+          onClick={() => setMainTab("banco")}
+          className={`flex-1 flex flex-col items-center justify-center p-4 rounded-[1.5rem] font-black uppercase tracking-widest transition-all ${mainTab === "banco" ? "bg-white text-purple-700 shadow-md border border-purple-100" : "text-gray-400 hover:bg-gray-200"}`}
+        >
+          <BookA size={24} className="mb-2" /> Banco de Evaluaciones (LMS)
+        </button>
+      </div>
+
+      {mainTab === "banco" ? (
+        <GlobalAssessmentBank />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Lista de Alumnos */}
         <div className="space-y-4">
           <h2 className="text-xl font-black text-gray-400 uppercase tracking-widest ml-4">Mis Alumnos</h2>
           {students.length === 0 ? (
@@ -439,6 +461,7 @@ export function TutorDashboard() {
           )}
         </div>
       </div>
+      )}
 
       {/* Modales */}
       {showUserCreator && (

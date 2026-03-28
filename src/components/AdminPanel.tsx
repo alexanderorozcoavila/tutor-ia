@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { User, userService } from "@/lib/userService";
 import { settingsService } from "@/lib/settingsService";
-import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save } from "lucide-react";
+import { lmsService, Subject } from "@/lib/lmsService";
+import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X } from "lucide-react";
 import { Modal } from "./Modal";
 import { useAlert } from "@/lib/AlertContext";
 
@@ -24,6 +25,15 @@ export function AdminPanel() {
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [attentionMessage, setAttentionMessage] = useState("");
   const [isSettingsLoading, setIsSettingsLoading] = useState(false);
+
+  // Estados LMS (Materias)
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [newSubjectName, setNewSubjectName] = useState("");
+  const [isSubjectActionLoading, setIsSubjectActionLoading] = useState(false);
+  
+  // Modal de Asignación a Tutor
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [selectedTutorSubjects, setSelectedTutorSubjects] = useState<string[]>([]);
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -46,9 +56,19 @@ export function AdminPanel() {
     }
   };
 
+  const loadSubjects = async () => {
+    try {
+      const allSubjects = await lmsService.getAllSubjects();
+      setSubjects(allSubjects);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadSettings();
+    loadSubjects();
   }, []);
 
   const handleUpdateSettings = async () => {
@@ -112,6 +132,66 @@ export function AdminPanel() {
       setUserToEdit(null);
       setEditPassword("");
       showAlert("Contraseña actualizada con éxito", { type: "success" });
+    } catch (err: any) {
+      showAlert(err.message, { type: "error" });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleCreateSubject = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubjectName.trim()) return;
+    setIsSubjectActionLoading(true);
+    try {
+      await lmsService.createSubject(newSubjectName.trim());
+      setNewSubjectName("");
+      loadSubjects();
+      showAlert("Materia global agregada", { type: "success" });
+    } catch (err: any) {
+      showAlert(err.message, { type: "error" });
+    } finally {
+      setIsSubjectActionLoading(false);
+    }
+  };
+
+  const handleDeleteSubject = async (id: string) => {
+    if (!confirm("¿Seguro que deseas eliminar esta materia? Esto afectará los repositorios asociados.")) return;
+    setIsSubjectActionLoading(true);
+    try {
+      await lmsService.deleteSubject(id);
+      loadSubjects();
+      showAlert("Materia eliminada", { type: "info" });
+    } catch (err: any) {
+      showAlert(err.message, { type: "error" });
+    } finally {
+      setIsSubjectActionLoading(false);
+    }
+  };
+
+  const openAssignModal = async (tutor: User) => {
+    setUserToEdit(tutor);
+    setSelectedTutorSubjects([]);
+    setIsAssignModalOpen(true);
+    setIsActionLoading(true);
+    try {
+      const tSubjects = await lmsService.getTutorSubjects(tutor.id);
+      setSelectedTutorSubjects(tSubjects.map(s => s.id));
+    } catch (err: any) {
+      showAlert(err.message, { type: "error" });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const saveTutorSubjects = async () => {
+    if (!userToEdit) return;
+    setIsActionLoading(true);
+    try {
+      await lmsService.assignSubjectsToTutor(userToEdit.id, selectedTutorSubjects);
+      setIsAssignModalOpen(false);
+      setUserToEdit(null);
+      showAlert("Materias asignadas correctamente", { type: "success" });
     } catch (err: any) {
       showAlert(err.message, { type: "error" });
     } finally {
@@ -203,6 +283,15 @@ export function AdminPanel() {
                         </span>
                       </td>
                       <td className="px-4 py-4 flex gap-2">
+                        {u.role === 'tutor' && (
+                          <button 
+                            onClick={() => openAssignModal(u)}
+                            className="p-2 text-indigo-400 hover:text-indigo-600 transition-colors"
+                            title="Asignar materias"
+                          >
+                            <BookA size={18} />
+                          </button>
+                        )}
                         <button 
                           onClick={() => {
                             setUserToEdit(u);
@@ -282,6 +371,44 @@ export function AdminPanel() {
         </div>
       </div>
 
+      {/* Catálogo Global de Materias (LMS) */}
+      <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border-2 border-indigo-50">
+        <h2 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-2">
+          <BookA className="text-indigo-500" /> Catálogo Global de Materias
+        </h2>
+        <div className="flex flex-col md:flex-row gap-8">
+          <form onSubmit={handleCreateSubject} className="md:w-1/3 space-y-4">
+            <p className="text-gray-500 font-bold text-sm">Crea repositorios de materias o áreas que los tutores podrán asignar para generar pruebas.</p>
+            <input
+              type="text"
+              value={newSubjectName}
+              onChange={(e) => setNewSubjectName(e.target.value)}
+              placeholder="Ej: Matemáticas Avanzadas"
+              className="w-full p-4 rounded-xl bg-gray-50 border-2 border-transparent focus:border-indigo-200 outline-none font-bold"
+            />
+            <button 
+              type="submit"
+              disabled={isSubjectActionLoading || !newSubjectName.trim()}
+              className="w-full p-4 bg-indigo-600 text-white rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isSubjectActionLoading ? <Loader2 className="animate-spin" /> : "Añadir Materia"}
+            </button>
+          </form>
+
+          <div className="md:w-2/3 flex flex-wrap gap-4">
+            {subjects.length === 0 && <p className="text-gray-400 font-bold italic w-full text-center p-8 bg-gray-50 rounded-2xl border-2 border-dashed">No hay materias catalogadas aún.</p>}
+            {subjects.map(sub => (
+              <div key={sub.id} className="bg-indigo-50 border border-indigo-100 text-indigo-700 px-4 py-3 rounded-2xl font-bold flex items-center gap-4">
+                {sub.name}
+                <button onClick={() => handleDeleteSubject(sub.id)} className="text-indigo-300 hover:text-red-500 transition-colors">
+                  <X size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* Modales de Gestión */}
       <Modal 
         isOpen={isPasswordModalOpen} 
@@ -341,6 +468,54 @@ export function AdminPanel() {
               {isActionLoading ? <Loader2 className="animate-spin" /> : "Sí, Eliminar"}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal 
+        isOpen={isAssignModalOpen} 
+        onClose={() => {
+          setIsAssignModalOpen(false);
+          setUserToEdit(null);
+        }}
+        title="Asignar Materias"
+      >
+        <div className="space-y-6">
+          <p className="text-gray-500 font-bold">Selecciona las materias que el tutor <span className="text-indigo-600">@{userToEdit?.username}</span> podrá gestionar.</p>
+          
+          <div className="max-h-60 overflow-y-auto space-y-2 p-2 px-4 rounded-xl border-2 border-gray-100 bg-gray-50">
+            {subjects.length === 0 && <p className="text-sm text-gray-400 font-bold py-2">No tienes materias registradas en el catálogo maestro.</p>}
+            {subjects.map(s => {
+              const isChecked = selectedTutorSubjects.includes(s.id);
+              return (
+                <label key={s.id} className="flex items-center gap-3 cursor-pointer p-3 rounded-lg hover:bg-white transition-all border border-transparent hover:border-gray-200">
+                  <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${isChecked ? 'bg-indigo-600 text-white' : 'bg-gray-200'}`}>
+                    {isChecked && <CheckSquare size={14} />}
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    className="hidden"
+                    checked={isChecked}
+                    onChange={() => {
+                      if (isChecked) {
+                        setSelectedTutorSubjects(prev => prev.filter(id => id !== s.id));
+                      } else {
+                        setSelectedTutorSubjects(prev => [...prev, s.id]);
+                      }
+                    }}
+                  />
+                  <span className="font-bold text-gray-700">{s.name}</span>
+                </label>
+              );
+            })}
+          </div>
+
+          <button 
+            onClick={saveTutorSubjects}
+            disabled={isActionLoading}
+            className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isActionLoading ? <Loader2 className="animate-spin" /> : "Guardar Relación"}
+          </button>
         </div>
       </Modal>
     </div>

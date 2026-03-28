@@ -92,7 +92,41 @@ CREATE TABLE IF NOT EXISTS assessment_submissions (
   completed_at TIMESTAMPTZ DEFAULT now()
 );
 
--- 9. Habilitar RLS (Row Level Security)
+-- 9. Catálogo Global de Materias (LMS)
+CREATE TABLE IF NOT EXISTS subjects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 10. Relación Tutor-Materia (Asignación por Admin)
+CREATE TABLE IF NOT EXISTS tutor_subjects (
+  tutor_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  subject_id UUID REFERENCES subjects(id) ON DELETE CASCADE,
+  PRIMARY KEY (tutor_id, subject_id)
+);
+
+-- 11. Objetivos de Aprendizaje Anidados a Materias
+CREATE TABLE IF NOT EXISTS objectives (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 12. Plantillas Globales de Evaluación Asociadas a un Objetivo
+CREATE TABLE IF NOT EXISTS assessment_templates (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  objective_id UUID NOT NULL REFERENCES objectives(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  time_limit_seconds INTEGER DEFAULT 0,
+  questions JSONB NOT NULL,
+  created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- 13. Habilitar RLS (Row Level Security)
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tutor_students ENABLE ROW LEVEL SECURITY;
@@ -100,8 +134,12 @@ ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE task_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assessments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE assessment_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE tutor_subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE objectives ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assessment_templates ENABLE ROW LEVEL SECURITY;
 
--- 10. Políticas de Acceso (MVP: Permitir todo por simplicidad en demo)
+-- 14. Políticas de Acceso (MVP: Permitir todo por simplicidad en demo)
 -- Nota: En producción real, estas políticas deben ser más restrictivas.
 CREATE POLICY "Permitir todo a usuarios" ON users FOR ALL USING (true);
 CREATE POLICY "Permitir todo en tareas" ON tasks FOR ALL USING (true);
@@ -110,6 +148,10 @@ CREATE POLICY "Permitir todo en ajustes" ON system_settings FOR ALL USING (true)
 CREATE POLICY "Permitir todo en sesiones" ON task_sessions FOR ALL USING (true);
 CREATE POLICY "Permitir todo en evaluaciones" ON assessments FOR ALL USING (true);
 CREATE POLICY "Permitir todo en resultados" ON assessment_submissions FOR ALL USING (true);
+CREATE POLICY "Permitir todo a materias" ON subjects FOR ALL USING (true);
+CREATE POLICY "Permitir todo a tutores materias" ON tutor_subjects FOR ALL USING (true);
+CREATE POLICY "Permitir todo a objetivos" ON objectives FOR ALL USING (true);
+CREATE POLICY "Permitir todo a plantillas" ON assessment_templates FOR ALL USING (true);
 
 -- 11. Insertar usuario admin inicial (opcional, el código lo crea si no existe)
 -- INSERT INTO users (username, password, role) VALUES ('admin', 'admin123', 'admin');
