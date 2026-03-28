@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Task, taskService, AssessmentQuestion } from "@/lib/taskService";
+import { planService } from "@/lib/planService";
 import { useAlert } from "@/lib/AlertContext";
 import { Clock, CheckCircle2, XCircle, ArrowRight, Save, Star, AlertTriangle, ClipboardSignature } from "lucide-react";
 import confetti from "canvas-confetti";
@@ -63,15 +64,26 @@ export function AssessmentModule({ task, onFinish }: Props) {
     setFinalScore(roundedScore);
 
     try {
-      await taskService.updateTask(task.id, {
-        status: "completed",
-        score: Math.round(100 * rawRatio), // MVP: Compatibilidad con dashboard 0-100%
-        metadata: {
-          ...task.metadata,
-          assessment_score_latam: roundedScore,
-          assessment_answers: answers
-        }
-      });
+      if (task.metadata?.is_plan_task) {
+        await planService.updateTareaPlanificada(task.id, {
+          estado: "completada",
+          metadata: {
+            ...task.metadata,
+            assessment_score_latam: roundedScore,
+            assessment_answers: answers
+          }
+        });
+      } else {
+        await taskService.updateTask(task.id, {
+          status: "completed",
+          score: Math.round(100 * rawRatio), 
+          metadata: {
+            ...task.metadata,
+            assessment_score_latam: roundedScore,
+            assessment_answers: answers
+          }
+        });
+      }
 
       if (rawRatio > 0.5) {
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });

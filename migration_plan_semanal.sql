@@ -54,7 +54,8 @@ CREATE TABLE tarea_planificada (
     modulo_id UUID NOT NULL,   
     
     alumno_id UUID NOT NULL,
-    orden_visual INTEGER DEFAULT 0 
+    orden_visual INTEGER DEFAULT 0,
+    metadata JSONB DEFAULT '{}' 
 );
 
 -- Habilitación de RLS en tarea_planificada

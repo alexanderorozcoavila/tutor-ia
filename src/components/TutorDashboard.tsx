@@ -8,6 +8,8 @@ import { TaskCreator } from "./TaskCreator";
 import { WeeklyPlanManager } from "./WeeklyPlanManager";
 import { ReviewBoard } from "./ReviewBoard";
 import { GlobalAssessmentBank } from "./GlobalAssessmentBank";
+import { AssessmentMatrix } from "./AssessmentMatrix";
+import { planService, TareaPlanificada } from "@/lib/planService";
 import { Modal } from "./Modal";
 import { 
   Users, UserPlus, BookOpen, Home, 
@@ -45,7 +47,7 @@ export function TutorDashboard() {
   const { showAlert } = useAlert();
   const { user: tutor } = useAuth();
   
-  const [mainTab, setMainTab] = useState<"mis_alumnos" | "banco" | "revisiones">("mis_alumnos");
+  const [mainTab, setMainTab] = useState<"mis_alumnos" | "banco" | "revisiones" | "reportes">("mis_alumnos");
   const [students, setStudents] = useState<User[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
   const [showUserCreator, setShowUserCreator] = useState(false);
@@ -60,6 +62,10 @@ export function TutorDashboard() {
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false);
+  
+  // Nuevo: Evaluaciones del sistema de planes
+  const [planAssessments, setPlanAssessments] = useState<TareaPlanificada[]>([]);
+  const [dbTasksCache, setDbTasksCache] = useState<Record<string, Task>>({});
 
   // Assessment Insights
   const [showAssessmentModal, setShowAssessmentModal] = useState(false);
@@ -94,8 +100,22 @@ export function TutorDashboard() {
 
   const loadStudentTasks = async (studentId: string) => {
     try {
+      // 1. Tareas Directas (Legacy/Global)
       const allTasks = await taskService.getTasks();
       setStudentTasks(allTasks.filter(t => t.assigned_to === studentId));
+
+      // 2. Evaluaciones del Plan (Nuevo LMS)
+      const planTasks = await planService.getTareasPlanificadasAlumno(studentId, 'assessment');
+      setPlanAssessments(planTasks);
+
+      // Cache de nombres de tareas base
+      const allModuleIds = [...new Set(planTasks.map(t => t.modulo_id))];
+      if (allModuleIds.length > 0) {
+        const rawTasks = await taskService.getTasks();
+        const map: Record<string, Task> = {};
+        rawTasks.forEach(t => map[t.id] = t);
+        setDbTasksCache(map);
+      }
     } catch (err) {
       console.error(err);
     }
@@ -209,6 +229,20 @@ export function TutorDashboard() {
     }
   };
 
+  const handleDeletePlanAssessment = async (id: string) => {
+    if (!confirm("¿Seguro que deseas eliminar esta evaluación del plan del alumno?")) return;
+    setIsActionLoading(true);
+    try {
+      await planService.deleteTareaPlanificada(id);
+      if (selectedStudent) loadStudentTasks(selectedStudent.id);
+      showAlert("Evaluación eliminada del plan", { type: "success" });
+    } catch (err: any) {
+      showAlert(err.message, { type: "error" });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
   const handleDeleteTask = async () => {
     if (!taskToDelete) return;
     setIsActionLoading(true);
@@ -275,12 +309,20 @@ export function TutorDashboard() {
         >
           <BookA size={24} className="mb-2" /> Banco de Evaluaciones (LMS)
         </button>
+        <button
+          onClick={() => setMainTab("reportes")}
+          className={`flex-1 flex flex-col items-center justify-center p-4 rounded-[1.5rem] font-black uppercase tracking-widest transition-all ${mainTab === "reportes" ? "bg-white text-emerald-700 shadow-md border border-emerald-100" : "text-gray-400 hover:bg-gray-200"}`}
+        >
+          <img src="https://api.iconify.design/lucide:bar-chart-3.svg?color=%23059669" className="w-6 h-6 mb-2 opacity-80" alt="Reportes" /> Reporte de Notas
+        </button>
       </div>
 
       {mainTab === "banco" ? (
         <GlobalAssessmentBank />
       ) : mainTab === "revisiones" ? (
         <ReviewBoard />
+      ) : mainTab === "reportes" ? (
+        <AssessmentMatrix />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Lista de Alumnos */}
@@ -454,6 +496,75 @@ export function TutorDashboard() {
                           )}
                         </div>
                       ))
+                    )}
+                  </div>
+
+                  {/* Nueva Sección: Evaluaciones del Plan Semanal */}
+                  <div className="space-y-4 pt-4 border-t-2 border-indigo-50">
+                    <h4 className="text-sm font-black text-purple-400 uppercase tracking-widest flex items-center gap-2">
+                       <ClipboardSignature size={16} /> Evaluaciones del Plan
+                    </h4>
+                    {planAssessments.length === 0 ? (
+                      <p className="text-gray-400 font-bold italic text-center py-6 bg-purple-50/30 rounded-2xl border-2 border-dashed border-purple-100">
+                        No hay evaluaciones asignadas en el plan.
+                      </p>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4">
+                        {planAssessments.map(evalu => {
+                          const baseTemplate = dbTasksCache[evalu.modulo_id];
+                          const isCompletada = evalu.estado === 'completada';
+                          
+                          return (
+                            <div key={evalu.id} className="flex items-center justify-between p-5 bg-white rounded-2xl border-4 border-purple-50 hover:border-purple-100 transition-all shadow-sm">
+                              <div className="flex items-center gap-4">
+                                <div className={`p-3 rounded-xl ${isCompletada ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600'}`}>
+                                  <ClipboardSignature size={20} />
+                                </div>
+                                <div className="max-w-[150px] md:max-w-xs">
+                                  <p className="font-black text-gray-800 truncate">{baseTemplate?.title || "Evaluación Semanal"}</p>
+                                  <p className={`text-[10px] font-black uppercase tracking-widest ${isCompletada ? 'text-emerald-500' : 'text-amber-500'}`}>
+                                    {isCompletada ? 'Completada' : 'Pendiente'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {isCompletada && (
+                                  <button
+                                    onClick={() => {
+                                      // Adaptamos TareaPlanificada a Task para el modal
+                                      const virtualTask: any = {
+                                        ...evalu,
+                                        type: 'assessment', // Compatibilidad con el modal
+                                        title: baseTemplate?.title || "Evaluación",
+                                        metadata: {
+                                          ...evalu.metadata,
+                                          questions: evalu.metadata?.questions || (baseTemplate?.metadata as any)?.questions 
+                                        }
+                                      };
+                                      setTaskToReview(virtualTask);
+                                      setShowAssessmentModal(true);
+                                    }}
+                                    className="px-4 py-2 bg-purple-100 text-purple-700 rounded-xl font-black text-xs hover:bg-purple-600 hover:text-white transition-all flex items-center gap-1"
+                                  >
+                                    Ver Resultados
+                                  </button>
+                                )}
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDeletePlanAssessment(evalu.id); }}
+                                  className="p-3 text-gray-300 hover:text-red-500 bg-gray-50 hover:bg-red-50 rounded-xl transition-all"
+                                  title="Eliminar del plan"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                                {!isCompletada && (
+                                   <span className="text-[10px] font-bold text-gray-400 italic px-3">En espera...</span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
 

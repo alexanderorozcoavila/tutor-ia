@@ -11,6 +11,7 @@ export interface TareaPlanificada {
   modulo_id: string;
   alumno_id: string;
   orden_visual: number;
+  metadata?: any;
   
   // Opcional, traído con JOIN
   task_detalle?: any;
@@ -144,6 +145,39 @@ export const planService = {
     return data || [];
   },
 
+  async getTareasPlanificadasAlumno(alumnoId: string, tipo?: string) {
+    if (LS_MODE) {
+      const all = getLocalTareasPlan();
+      return all.filter(t => t.alumno_id === alumnoId && (!tipo || t.tipo_modulo === tipo));
+    }
+
+    let query = supabase.from('tarea_planificada').select('*').eq('alumno_id', alumnoId);
+    if (tipo) query = query.eq('tipo_modulo', tipo);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return (data || []) as TareaPlanificada[];
+  },
+
+  async getAllPlanesAlumno(alumnoId: string): Promise<PlanSemanal[]> {
+    if (LS_MODE) {
+      return getLocalPlanes().filter(p => p.alumno_id === alumnoId)
+        .sort((a, b) => new Date(b.fecha_inicio).getTime() - new Date(a.fecha_inicio).getTime());
+    }
+
+    const { data, error } = await supabase
+      .from('plan_semanal')
+      .select('*, tarea_planificada(*)')
+      .eq('alumno_id', alumnoId)
+      .order('fecha_inicio', { ascending: false });
+
+    if (error) throw error;
+    return (data || []).map(d => ({
+      ...d,
+      tareas: d.tarea_planificada || []
+    }));
+  },
+
   // 0.7. Obtener el logro del día desde el servidor
   async getHistorialDiarioDia(planId: string, diaSemana: number) {
     if (LS_MODE) return null; // No disponible en local
@@ -243,6 +277,69 @@ export const planService = {
     const { error } = await supabase.from('tarea_planificada').insert(payload);
     if (error) throw error;
     return true;
+  },
+
+  async assignAssessmentToPlan(planId: string, templateId: string, alumnoId: string, puntos: number = 20) {
+    if (LS_MODE) {
+       const all = getLocalTareasPlan();
+       const newTask: TareaPlanificada = {
+         id: Math.random().toString(36).substr(2, 9),
+         plan_semanal_id: planId,
+         dia_semana: null as any, 
+         puntos_valor: puntos,
+         estado: "pendiente",
+         tipo_modulo: "assessment",
+         modulo_id: templateId,
+         alumno_id: alumnoId,
+         orden_visual: 0
+       };
+       saveLocalTareasPlan([...all, newTask]);
+       return true;
+    }
+
+    const { error } = await supabase.from('tarea_planificada').insert([{
+      plan_semanal_id: planId,
+      dia_semana: null, 
+      puntos_valor: puntos,
+      estado: "pendiente",
+      tipo_modulo: "assessment",
+      modulo_id: templateId,
+      alumno_id: alumnoId
+    }]);
+    if (error) throw error;
+    return true;
+  },
+
+  async updateTareaPlanificada(id: string, updates: Partial<TareaPlanificada> & { metadata?: any }) {
+    if (LS_MODE) {
+      const all = getLocalTareasPlan();
+      const idx = all.findIndex(t => t.id === id);
+      if (idx !== -1) {
+        all[idx] = { ...all[idx], ...updates };
+        saveLocalTareasPlan(all);
+        return all[idx];
+      }
+      throw new Error("Tarea no encontrada");
+    }
+
+    const { data, error } = await supabase
+      .from('tarea_planificada')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteTareaPlanificada(id: string) {
+    if (LS_MODE) {
+      const all = getLocalTareasPlan();
+      saveLocalTareasPlan(all.filter(t => t.id !== id));
+      return;
+    }
+    const { error } = await supabase.from('tarea_planificada').delete().eq('id', id);
+    if (error) throw error;
   },
 
   async updateEstadoTareaPlanificada(tareaId: string, nuevoEstado: "pendiente" | "en_revision" | "completada") {

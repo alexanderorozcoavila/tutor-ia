@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { lmsService, Subject, Objective, AssessmentTemplate } from "@/lib/lmsService";
+import { planService, PlanSemanal } from "@/lib/planService";
 import { useAuth } from "@/lib/AuthContext";
 import { BookA, Target, ClipboardSignature, Plus, ArrowLeft, Loader2, Play, Users, Search } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
@@ -32,6 +33,9 @@ export function GlobalAssessmentBank() {
   const [students, setStudents] = useState<User[]>([]);
   const [selectedStudents, setSelectedStudents] = useState<string[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [studentPlans, setStudentPlans] = useState<Record<string, PlanSemanal[]>>({});
+  const [targetPlans, setTargetPlans] = useState<Record<string, string>>({}); // studentId -> planId
+  const [isLoadingPlans, setIsLoadingPlans] = useState(false);
 
   useEffect(() => {
     if (user) loadSubjects();
@@ -93,6 +97,21 @@ export function GlobalAssessmentBank() {
       const studs = await userService.getStudentsForTutor(user!.id);
       setStudents(studs);
       setIsAssignModalOpen(true);
+      
+      // Cargar planes de una vez
+      setIsLoadingPlans(true);
+      const plansMap: Record<string, PlanSemanal[]> = {};
+      const targetMap: Record<string, string> = {};
+      
+      for (const s of studs) {
+        const p = await planService.getAllPlanesAlumno(s.id);
+        plansMap[s.id] = p;
+        if (p.length > 0) targetMap[s.id] = p[0].id; // Default al más reciente/activo
+      }
+      setStudentPlans(plansMap);
+      setTargetPlans(targetMap);
+      setIsLoadingPlans(false);
+
     } catch(err: any) {
       showAlert(err.message, { type: "error" });
     }
@@ -101,22 +120,35 @@ export function GlobalAssessmentBank() {
   const handleAssignToStudents = async () => {
     if (!templateToAssign || selectedStudents.length === 0) return;
     setIsAssigning(true);
+    let successCount = 0;
+    let failCount = 0;
+
     try {
       for (const studentId of selectedStudents) {
-        await taskService.createTask({
-          title: templateToAssign.title,
-          type: "assessment",
-          assigned_to: studentId,
-          supported_devices: ["desktop", "tablet", "mobile"],
-          metadata: {
-            assessment_time_limit: templateToAssign.time_limit_seconds,
-            questions: templateToAssign.questions,
-            template_id: templateToAssign.id
-          }
-        });
+        const selectedPlanId = targetPlans[studentId];
+        
+        if (selectedPlanId) {
+          // Caso ÉXITO: Asignar al plan semanal (LMS Nuevo)
+          await planService.assignAssessmentToPlan(
+            selectedPlanId, 
+            templateToAssign.id, 
+            studentId,
+            20 // Puntos base para exámenes
+          );
+          successCount++;
+        } else {
+          failCount++;
+        }
       }
+
       setIsAssignModalOpen(false);
-      showAlert("Evaluación distribuida exitosamente a los alumnos.", { type: "success" });
+      if (failCount === 0) {
+        showAlert(`Evaluación asignada a ${successCount} planes semanales.`, { type: "success" });
+      } else if (successCount > 0) {
+        showAlert(`Asignada a ${successCount} alumnos. ${failCount} alumnos no tienen un plan semanal activo.`, { type: "info" });
+      } else {
+        showAlert("No se pudo asignar. Los alumnos seleccionados no tienen un plan semanal activo.", { type: "error" });
+      }
     } catch (err: any) {
       showAlert(err.message, { type: "error" });
     } finally {
@@ -290,21 +322,47 @@ export function GlobalAssessmentBank() {
             {students.length === 0 && <p className="text-center font-bold text-gray-400">No tienes alumnos.</p>}
             {students.map(s => {
               const isSelected = selectedStudents.includes(s.id);
+              const plans = studentPlans[s.id] || [];
+              
               return (
-                <button 
-                  key={s.id}
-                  onClick={() => {
-                    if(isSelected) setSelectedStudents(prev => prev.filter(x => x !== s.id));
-                    else setSelectedStudents(prev => [...prev, s.id]);
-                  }}
-                  className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-gray-100 hover:border-gray-200'}`}
-                >
-                  <span className={`font-black uppercase text-sm ${isSelected ? 'text-emerald-700' : 'text-gray-700'}`}>{s.username}</span>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-emerald-500 bg-emerald-500' : 'border-gray-300'}`}>
-                    {isSelected && <div className="w-2 h-2 bg-white rounded-full" />}
+                <div key={s.id} className={`p-4 rounded-2xl border-2 transition-all ${isSelected ? 'border-purple-300 bg-purple-50 shadow-sm' : 'border-gray-100 hover:border-gray-200 bg-white opacity-60'}`}>
+                  <div 
+                    className="flex items-center justify-between mb-3 cursor-pointer"
+                    onClick={() => {
+                      if (isSelected) setSelectedStudents(prev => prev.filter(id => id !== s.id));
+                      else setSelectedStudents(prev => [...prev, s.id]);
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-4 h-4 rounded-full border-2 ${isSelected ? 'bg-purple-600 border-purple-600' : 'border-gray-300'}`} />
+                      <span className="font-bold text-gray-800 uppercase text-xs">{s.username}</span>
+                    </div>
                   </div>
-                </button>
-              )
+
+                  {isSelected && (
+                    <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                      <label className="text-[10px] font-black text-purple-400 uppercase tracking-widest pl-1">Semana del Examen</label>
+                      {isLoadingPlans ? (
+                        <div className="text-[10px] text-gray-400 font-bold italic py-1">Cargando planes...</div>
+                      ) : plans.length === 0 ? (
+                        <div className="text-[10px] text-red-500 font-bold italic py-1">⚠️ Sin planes disponibles</div>
+                      ) : (
+                        <select 
+                          value={targetPlans[s.id] || ""}
+                          onChange={(e) => setTargetPlans({ ...targetPlans, [s.id]: e.target.value })}
+                          className="w-full p-2 rounded-lg bg-white border-2 border-purple-100 text-[10px] font-black text-gray-700 outline-none focus:border-purple-400 transition-colors"
+                        >
+                          {plans.map(p => (
+                            <option key={p.id} value={p.id}>
+                              Plan del {new Date(p.fecha_inicio).toLocaleDateString()}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
             })}
           </div>
 

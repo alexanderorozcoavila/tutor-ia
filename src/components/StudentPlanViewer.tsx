@@ -2,10 +2,11 @@
 
 import { useOptimistic, useState, useEffect, useCallback, startTransition } from "react";
 import { planService, PlanSemanal, TareaPlanificada } from "@/lib/planService";
+import { supabase } from "@/lib/supabase";
 import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
 import { useAlert } from "@/lib/AlertContext";
-import { CheckCircle2, Star, Gift, Loader2, Sparkles, Clock, Trophy, Medal } from "lucide-react";
+import { CheckCircle2, Star, Gift, Loader2, Sparkles, Clock, Trophy, Medal, ClipboardSignature } from "lucide-react";
 import confetti from "canvas-confetti";
 import parse from "html-react-parser";
 import { calcularNivelDiario } from "@/lib/actions/gamification";
@@ -22,6 +23,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
   const [tareasCompletas, setTareasCompletas] = useState<TareaPlanificada[]>([]);
   const [tareasEnRevision, setTareasEnRevision] = useState<TareaPlanificada[]>([]);
   const [tareasPendientes, setTareasPendientes] = useState<TareaPlanificada[]>([]);
+  const [evaluacionesSemanales, setEvaluacionesSemanales] = useState<TareaPlanificada[]>([]);
   const [dbTasksCache, setDbTasksCache] = useState<Record<string, Task>>({});
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [dailyLevel, setDailyLevel] = useState<number>(0);
@@ -50,7 +52,13 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
     setTareasEnRevision(todaysPlanTasks.filter(t => t.estado === 'en_revision'));
     setTareasPendientes(todaysPlanTasks.filter(t => t.estado === 'pendiente'));
 
-    const allModuleIds = [...new Set(todaysPlanTasks.map(t => t.modulo_id))];
+    // Evaluaciones Semanales (Fase assessments)
+    const weekEvaluations = plan.tareas
+      .filter(t => t.tipo_modulo === 'assessment')
+      .sort((a, b) => (a.orden_visual || 0) - (b.orden_visual || 0));
+    setEvaluacionesSemanales(weekEvaluations);
+
+    const allModuleIds = [...new Set([...todaysPlanTasks, ...weekEvaluations].map(t => t.modulo_id))];
     if (allModuleIds.length > 0) {
       try {
         const rawTasks = await taskService.getTasks();
@@ -143,16 +151,37 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
     }
   };
 
-  const handleCardClick = (tarea: TareaPlanificada) => {
+  const handleCardClick = async (tarea: TareaPlanificada) => {
     if (tarea.tipo_modulo === 'domestic') {
        // Autocompleta directo
        handleEstadoOptimistic(tarea, 'completada');
+    } else if (tarea.tipo_modulo === 'assessment') {
+       try {
+         const { data: template } = await supabase.from('assessment_templates').select('*').eq('id', tarea.modulo_id).single();
+         if (template) {
+           const virtualTask: Task = {
+             id: tarea.id, 
+             title: template.title,
+             type: 'assessment',
+             status: 'pending',
+             score: 0,
+             created_at: new Date().toISOString(),
+             metadata: {
+               questions: template.questions,
+               assessment_time_limit: template.time_limit_seconds,
+               template_id: template.id,
+               is_plan_task: true
+             }
+           };
+           onStartModule(virtualTask);
+         }
+       } catch (e) {
+         console.error("Error al iniciar evaluación:", e);
+         showAlert("No se pudo cargar la evaluación.", { type: "error" });
+       }
     } else {
        const baseTask = dbTasksCache[tarea.modulo_id];
        if (baseTask) {
-         // OJO: Al terminar, el TaskManager no tiene cómo avisarle al Plan actualmente en el MVP. 
-         // Mostraremos un botón rápido para fingir que "lo terminó" y lo manda a revisión por ahora para destrabar el UX.
-         // En el LMS real, el TaskManager dispara onSubmit().
          handleEstadoOptimistic(tarea, 'en_revision');
          onStartModule(baseTask);
        }
@@ -162,7 +191,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
   const progressPercent = Math.min(100, Math.round((optimisticPoints / plan.meta_puntos_total) * 100));
 
   return (
-    <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+    <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
       <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border-4 border-emerald-50 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-100/50 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         
@@ -212,6 +241,42 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
           </div>
         </div>
       </div>
+
+      {/* Sección de Evaluaciones Semanales */}
+      {evaluacionesSemanales.length > 0 && (
+        <div className="space-y-4">
+          <h3 className="text-xl font-black text-purple-400 uppercase tracking-widest pl-4">Retos de la Semana</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {evaluacionesSemanales.map(evalu => {
+              const isCompletada = evalu.estado === 'completada';
+              return (
+                <div 
+                  key={evalu.id}
+                  onClick={() => !isCompletada && handleCardClick(evalu)}
+                  className={`group p-6 rounded-[2rem] border-4 transition-all flex items-center justify-between ${
+                    isCompletada 
+                    ? "bg-purple-50/50 border-purple-100 opacity-70" 
+                    : "bg-white border-white shadow-lg cursor-pointer hover:border-purple-200 active:scale-[0.98]"
+                  }`}
+                >
+                   <div className="flex items-center gap-4">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isCompletada ? 'bg-purple-200 text-white' : 'bg-purple-50 text-purple-500'}`}>
+                        <ClipboardSignature size={28} />
+                      </div>
+                      <div>
+                        <h4 className={`text-xl font-black ${isCompletada ? 'text-purple-900 line-through' : 'text-gray-800'}`}>
+                          {isCompletada ? "Evaluación Realizada" : "Evaluación Semanal"}
+                        </h4>
+                        <p className="text-purple-500 font-bold text-xs uppercase">+{evalu.puntos_valor} puntos</p>
+                      </div>
+                   </div>
+                   {isCompletada && <CheckCircle2 className="text-purple-500" size={24} />}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         <h3 className="text-xl font-black text-gray-400 uppercase tracking-widest pl-4">Aventuras de Hoy</h3>
