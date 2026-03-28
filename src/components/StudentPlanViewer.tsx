@@ -4,6 +4,7 @@ import { useOptimistic, useState, useEffect, useCallback, startTransition } from
 import { planService, PlanSemanal, TareaPlanificada } from "@/lib/planService";
 import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
+import { useAlert } from "@/lib/AlertContext";
 import { CheckCircle2, Star, Gift, Loader2, Sparkles, Clock, Trophy, Medal } from "lucide-react";
 import confetti from "canvas-confetti";
 import parse from "html-react-parser";
@@ -17,6 +18,7 @@ interface Props {
 
 export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Props) {
   const { user } = useAuth();
+  const { showAlert } = useAlert();
   const [tareasCompletas, setTareasCompletas] = useState<TareaPlanificada[]>([]);
   const [tareasEnRevision, setTareasEnRevision] = useState<TareaPlanificada[]>([]);
   const [tareasPendientes, setTareasPendientes] = useState<TareaPlanificada[]>([]);
@@ -63,13 +65,24 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
     // Cargar logro del día (Fase 4)
     try {
       const historial = await planService.getHistorialDiarioDia(plan.id, today);
+      let currentLevel = 0;
       if (historial) {
-        setDailyLevel(historial.nivel_alcanzado);
+        currentLevel = historial.nivel_alcanzado;
+        setDailyLevel(currentLevel);
+      }
+
+      // Auto-sanación: Si todas las tareas de hoy están completas pero el nivel no es 3, re-calcular.
+      const totalPuntosHoy = todaysPlanTasks.reduce((acc, t) => acc + t.puntos_valor, 0);
+      const puntosCompletosHoy = todaysPlanTasks.filter(t => t.estado === 'completada').reduce((acc, t) => acc + t.puntos_valor, 0);
+      
+      if (totalPuntosHoy > 0 && puntosCompletosHoy === totalPuntosHoy && currentLevel < 3 && user) {
+        const res = await calcularNivelDiario(plan.id, today, user.id);
+        if (res) setDailyLevel(res.nivel);
       }
     } catch (e) {
       console.error("Error loading daily history:", e);
     }
-  }, [plan.id, plan.tareas]);
+  }, [plan.id, plan.tareas, user]);
 
   useEffect(() => {
     loadData();
@@ -123,7 +136,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
           setTimeout(() => setShowRewardModal(true), 1500);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error cambiando estado:", err);
       showAlert(err.message || "Error al actualizar", { type: "error" });
       loadData(); 

@@ -6,6 +6,7 @@ import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
 import { Check, X, Loader2, BookOpen, Clock, AlertCircle } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
+import { calcularNivelDiario } from "@/lib/actions/gamification";
 
 export function ReviewBoard() {
   const { user } = useAuth();
@@ -49,6 +50,18 @@ export function ReviewBoard() {
       const newState = flag === 'aprobar' ? 'completada' : 'pendiente';
       await planService.updateEstadoTareaPlanificada(tareaId, newState);
       
+      // Sincronizar Gamificación en Tiempo Real (Fase 4 - Fix)
+      if (flag === 'aprobar') {
+        const tareaToCalcular = tareas.find(t => t.id === tareaId);
+        if (tareaToCalcular && tareaToCalcular.plan_semanal_id && tareaToCalcular.alumno_id) {
+          await calcularNivelDiario(
+            tareaToCalcular.plan_semanal_id, 
+            tareaToCalcular.dia_semana, 
+            tareaToCalcular.alumno_id
+          );
+        }
+      }
+
       showAlert(
         flag === 'aprobar' ? "¡Tarea aprobada con éxito!" : "Se ha regresado la tarea al alumno.", 
         { type: flag === 'aprobar' ? 'success' : 'info' }
