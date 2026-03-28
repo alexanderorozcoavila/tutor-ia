@@ -11,7 +11,8 @@ import {
   Users, UserPlus, BookOpen, Home, 
   ChevronRight, Plus, Calendar, GraduationCap,
   Clock, Bell, Settings2, Loader2, X, Trash2, AlertTriangle, 
-  Star, DatabaseZap, CheckCircle2, Image as ImageIcon, BookA
+  Star, DatabaseZap, CheckCircle2, Image as ImageIcon, BookA,
+  ClipboardSignature, FileText
 } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
 
@@ -57,6 +58,9 @@ export function TutorDashboard() {
   const [showScoreModal, setShowScoreModal] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [showDeleteTaskModal, setShowDeleteTaskModal] = useState(false);
+
+  // Assessment Insights
+  const [showAssessmentModal, setShowAssessmentModal] = useState(false);
 
   // Estados para modales de gestión
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -391,19 +395,43 @@ export function TutorDashboard() {
                             </div>
                           </div>
 
-                          {(t.reason_not_done || t.metadata?.evidence) && (
-                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                          {(t.reason_not_done || t.metadata?.evidence || t.metadata?.assessment_answers || t.metadata?.dictation_text || t.metadata?.reading_text) && (
+                            <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 mt-2 space-y-3">
                               {t.status === 'failed' && t.reason_not_done && (
-                                <div className="flex gap-2 items-start text-sm">
-                                  <AlertTriangle size={16} className="text-orange-500 mt-1 shrink-0" />
-                                  <p className="text-gray-600 italic font-bold">" {t.reason_not_done} "</p>
+                                <div className="flex gap-2 items-start text-sm bg-orange-50 p-3 rounded-lg border border-orange-100">
+                                  <AlertTriangle size={16} className="text-orange-500 mt-0.5 shrink-0" />
+                                  <p className="text-orange-900 italic font-bold">" {t.reason_not_done} "</p>
                                 </div>
                               )}
+                              
+                              {t.type === 'dictation' && t.metadata?.dictation_text && (
+                                <div className="text-xs text-gray-500 bg-white p-2 rounded-lg border border-gray-200 shadow-sm leading-relaxed">
+                                  <span className="font-black text-gray-400 uppercase mr-1">Texto a dictar:</span>
+                                  <span className="italic">{t.metadata.dictation_text.replace(/<[^>]+>/g, '')}</span>
+                                </div>
+                              )}
+                              {t.type === 'reading' && t.metadata?.reading_text && (
+                                <div className="text-xs text-gray-500 bg-white p-2 rounded-lg border border-gray-200 shadow-sm leading-relaxed">
+                                  <span className="font-black text-gray-400 uppercase mr-1">Lectura:</span>
+                                  <span className="italic">{t.metadata.reading_text}</span>
+                                </div>
+                              )}
+
+                              {t.type === 'assessment' && t.metadata?.assessment_answers && (
+                                <button
+                                  onClick={() => { setTaskToReview(t); setShowAssessmentModal(true); }}
+                                  className="w-full flex justify-center items-center gap-2 px-4 py-3 bg-purple-100 text-purple-700 hover:bg-purple-600 hover:text-white rounded-xl text-sm font-black transition-all shadow-sm"
+                                >
+                                  <ClipboardSignature size={18} /> Ver Respuestas de la Evaluación
+                                </button>
+                              )}
+
                               {t.metadata?.evidence && (
                                 <div className="mt-2">
+                                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><ImageIcon size={10} /> Evidencia Adjunta</p>
                                   <div 
                                     onClick={() => setSelectedEvidence(t.metadata.evidence)}
-                                    className="relative w-32 aspect-video rounded-lg overflow-hidden border-2 border-white cursor-zoom-in shadow-sm"
+                                    className="relative w-32 aspect-video rounded-lg overflow-hidden border-2 border-white cursor-zoom-in shadow-sm hover:scale-105 transition-transform"
                                   >
                                     <AsyncImageWithSkeleton src={t.metadata.evidence} alt="Evidencia" className="w-full h-full" />
                                   </div>
@@ -604,6 +632,79 @@ export function TutorDashboard() {
             />
           </div>
         </div>
+      )}
+
+      {showAssessmentModal && taskToReview && taskToReview.type === "assessment" && (
+        <Modal
+          isOpen={showAssessmentModal}
+          onClose={() => setShowAssessmentModal(false)}
+          title="Resultados de Evaluación"
+        >
+          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+            <div className="flex justify-between items-center bg-purple-50 p-4 rounded-2xl border border-purple-100">
+               <div className="flex items-center gap-3 text-purple-900">
+                  <div className="p-3 bg-purple-600 text-white rounded-xl">
+                    <ClipboardSignature size={24} />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-lg">{taskToReview.title}</h3>
+                    <p className="text-xs font-bold text-purple-600/70">Alumno: {selectedStudent?.username}</p>
+                  </div>
+               </div>
+               <div className="text-center bg-white px-4 py-2 rounded-xl border border-purple-100 shadow-sm">
+                 <p className="text-[10px] font-black uppercase text-gray-400">Nota Latam</p>
+                 <p className="text-2xl font-black text-purple-600">{taskToReview.metadata.assessment_score_latam?.toFixed(1) || "?"}</p>
+               </div>
+            </div>
+
+            <div className="space-y-4">
+              {taskToReview.metadata.questions?.map((q: any, idx: number) => {
+                const studentAnswerIdx = taskToReview.metadata.assessment_answers?.[idx];
+                const isCorrect = studentAnswerIdx === q.correctIndex;
+                const wasSkipped = studentAnswerIdx === -1 || studentAnswerIdx === undefined;
+
+                return (
+                  <div key={idx} className={`p-5 rounded-2xl border-l-8 bg-white shadow-sm border ${isCorrect ? 'border-l-emerald-400 border-gray-100' : 'border-l-red-400 border-red-50'}`}>
+                    <p className="font-black text-gray-800 mb-3 text-sm">{idx + 1}. {q.text}</p>
+                    <div className="space-y-2 mb-3">
+                      {q.options.map((opt: string, optIdx: number) => {
+                        const isStudentChoice = studentAnswerIdx === optIdx;
+                        const isActualCorrect = q.correctIndex === optIdx;
+                        
+                        let badgeClass = "border-transparent bg-gray-50 text-gray-500 opacity-60";
+                        if (isStudentChoice && isActualCorrect) badgeClass = "border-emerald-300 bg-emerald-50 text-emerald-800 font-bold shadow-sm ring-2 ring-emerald-100";
+                        else if (isStudentChoice && !isActualCorrect) badgeClass = "border-red-300 bg-red-50 text-red-800 font-bold shadow-sm ring-2 ring-red-100";
+                        else if (!isStudentChoice && isActualCorrect) badgeClass = "border-emerald-300 bg-emerald-50 text-emerald-700 font-bold border-dashed";
+
+                        return (
+                          <div key={optIdx} className={`p-2 rounded-xl text-xs border ${badgeClass} flex items-center justify-between transition-all`}>
+                            <span>{opt}</span>
+                            {isStudentChoice && (
+                              <span className="text-[9px] font-black uppercase tracking-widest">{isActualCorrect ? '✓ Alumno' : '✗ Alumno (Error)'}</span>
+                            )}
+                            {!isStudentChoice && isActualCorrect && (
+                              <span className="text-[9px] font-black uppercase tracking-widest">Respuesta Correcta</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {wasSkipped && (
+                      <p className="text-xs font-bold text-red-500 bg-red-50 p-2 rounded-lg inline-block">El alumno se saltó esta pregunta o no respondió.</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <button 
+              onClick={() => setShowAssessmentModal(false)}
+              className="w-full py-4 bg-gray-100 text-gray-500 hover:bg-gray-200 rounded-xl font-black mt-4"
+            >
+              Cerrar y volver
+            </button>
+          </div>
+        </Modal>
       )}
 
       {/* Modal confirmar eliminar tarea */}

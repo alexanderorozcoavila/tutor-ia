@@ -84,13 +84,17 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   const saveProgress = useCallback((index: number) => {
     if (!PROGRESS_KEY) return;
     localStorage.setItem(PROGRESS_KEY, String(index));
-    // Fire-and-forget hacia Supabase (metadata.progress_index)
+    // Reconstruir el JSON completo para no sobrescribir y perder dictation_text en Supabase
     if (taskId) {
       taskService.updateTask(taskId, {
-        metadata: { progress_index: index }
+        metadata: {
+          dictation_text: initialText,
+          config: config,
+          progress_index: index
+        }
       } as any).catch(err => console.warn("[Progress] Error en DB:", err));
     }
-  }, [PROGRESS_KEY, taskId]);
+  }, [PROGRESS_KEY, taskId, initialText, config]);
 
   const clearProgress = useCallback(() => {
     if (!PROGRESS_KEY) return;
@@ -305,7 +309,8 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   // aplica .phrase-active al span correspondiente al índice actual y hace scroll
   // suave para centrar la frase en la pantalla.
   useEffect(() => {
-    if (step !== "DICTATING") return;
+    //if (step !== "DICTATING") return;
+    if (step !== "DICTATING" || phrases.length === 0) return;
 
     // Limpiar highlight previo
     document.querySelectorAll<HTMLElement>(".phrase-span").forEach(el => {
@@ -320,7 +325,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
       activeEl.classList.add("phrase-active");
       activeEl.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  }, [currentIndex, step]);
+  }, [currentIndex, step, phrases]);
 
   const handleNext = useCallback(() => {
     if (isSpeaking) return; // Bloquear salto si está hablando
@@ -365,8 +370,9 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
           // Guardar url / base64 en la nueva columna de bucket
           image_url: finalBase64.split(",")[1] || finalBase64,
           metadata: {
-            ...initialConfig, // Mantener config original
-            dictation_text: initialText
+            config: initialConfig, // Mantener config original anidado
+            dictation_text: initialText,
+            progress_index: currentIndex
           }
         });
       }
@@ -394,18 +400,20 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Usar isLocked para candado anti-rebote integral (Audio + 2s cooldown)
-      if (step === "DICTATING" && !isLocked && e.code === "Space") {
-        e.preventDefault();
-        // Devolver el foco al documento aunque se haya clickeado un botón
-        if (document.activeElement instanceof HTMLElement) {
-          document.activeElement.blur();
+      if (step === "DICTATING" && e.code === "Space") {
+        e.preventDefault(); // Prevenir el salto nativo de barra espaciadora
+        if (!isLocked) {
+          // Devolver el foco al documento aunque se haya clickeado un botón
+          if (document.activeElement instanceof HTMLElement) {
+            document.activeElement.blur();
+          }
+          handleNext();
         }
-        handleNext();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [step, handleNext, isSpeaking]);
+  }, [step, handleNext, isLocked]);
 
   // Refs para acceder al estado actualizado en handleVoiceCommand sin stale closures
   const handleNextRef = useRef(handleNext);
@@ -579,7 +587,45 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
 
   if (step === "DICTATING") {
     return (
-      <div className="w-full max-w-5xl mx-auto p-4 flex flex-col gap-8 relative">
+      <div className="w-full max-w-5xl mx-auto p-4 flex flex-col gap-6 relative animate-in fade-in duration-500">
+
+        {/* === Barra Superior Anclada: Controles Multimedia Directos === */}
+        <div className="sticky top-20 z-[100] bg-white/90 backdrop-blur-xl p-4 md:px-8 rounded-[2rem] shadow-xl shadow-indigo-100/50 border-2 border-indigo-50 flex items-center justify-between mb-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => speak(phrases[currentIndex])}
+              disabled={isSpeaking}
+              className="p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 active:scale-95 transition-all shadow-sm disabled:opacity-50"
+              title="Escuchar frase de nuevo"
+            >
+              <RefreshCcw size={24} />
+            </button>
+            <div className="h-8 w-px bg-indigo-100 hidden sm:block"></div>
+            <button
+              onMouseDown={startRecording}
+              onMouseUp={stopRecording}
+              className={`p-4 rounded-full transition-all shadow-md active:scale-90 ${isRecording ? "bg-red-500 text-white animate-pulse shadow-red-200" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}
+              title="Mantén para decir: 'Ya copié'"
+            >
+              {isListening ? <Loader2 className="animate-spin text-blue-600" size={24} /> : <Play size={24} />}
+            </button>
+          </div>
+
+          <div className="hidden md:flex flex-col items-center">
+            <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">Dictado en Progreso</span>
+            <div className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Frase {currentIndex + 1} de {phrases.length}
+            </div>
+          </div>
+
+          <button
+            onClick={handleNext}
+            disabled={isLocked}
+            className={`px-8 py-4 rounded-full font-black text-lg shadow-lg active:scale-95 transition-all flex items-center gap-2 ${isLocked ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-80 shadow-none border-2 border-transparent" : "bg-gradient-to-r from-emerald-400 to-green-500 text-white hover:shadow-green-200"}`}
+          >
+            {isLocked ? (isSpeaking ? "Escucha..." : "Espera...") : "¡Siguiente!"} {!isLocked && <CheckCircle2 size={24} />}
+          </button>
+        </div>
         {/* Alerta de Atención */}
         {showAlert && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none p-12">
@@ -615,53 +661,25 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
 
           <div className="w-full space-y-8">
 
-            {/* === VISOR GLOBAL: HTML enriquecido sin scroll interno ===
+            {/* === VISOR GLOBAL: HTML/Texto enriquecido sin scroll interno ===
                 El contenedor ya no tiene max-h ni overflow, crece con el contenido.
                 annotateHTML() inyecta data-phrase-index en cada frase para el highlight. */}
-            {!config.hideText && initialText && /<[a-z][\s\S]*>/i.test(initialText) && (
-              <div className="bg-gray-50 border-2 border-gray-100 rounded-[2rem] p-6">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Texto Completo (Referencia)</p>
+            {!config.hideText && initialText && (
+              <div className="bg-gray-50 border-2 border-gray-100 rounded-[2rem] p-6 w-full text-lg md:text-xl font-medium text-gray-800 leading-relaxed max-w-none prose prose-indigo">
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Texto Activo</p>
                 <div className="rich-viewer">
                   {parse(annotateHTML(initialText, phrases))}
                 </div>
               </div>
             )}
 
-            <div className="pt-12 border-t border-gray-50 flex flex-col items-center gap-8">
-              <h3 className="text-4xl font-black text-gray-800">¿Ya copiaste esta frase?</h3>
-
-              <div className="flex flex-col items-center gap-6">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => speak(phrases[currentIndex])}
-                    className="p-6 bg-gray-100 text-gray-600 rounded-full hover:bg-gray-200 active:scale-95 transition-all shadow-sm"
-                    title="Repetir frase"
-                  >
-                    <RefreshCcw size={32} />
-                  </button>
-
-                  <button
-                    onClick={handleNext}
-                    disabled={isLocked}
-                    className={`px-16 py-6 rounded-full font-black text-3xl shadow-2xl transition-all flex items-center gap-4 ${isLocked ? "bg-gray-200 text-gray-400 cursor-not-allowed opacity-80" : "bg-green-500 text-white hover:bg-green-600 active:scale-95"}`}
-                  >
-                    {isSpeaking ? "Escuchando..." : isLocked ? "Espera..." : "¡Listo, ya copié!"} {!isLocked && <CheckCircle2 size={32} />}
-                  </button>
-
-                  <button
-                    onMouseDown={startRecording}
-                    onMouseUp={stopRecording}
-                    className={`p-6 rounded-full transition-all shadow-lg active:scale-90 ${isRecording ? "bg-red-500 text-white animate-pulse" : "bg-blue-500 text-white"}`}
-                    title="Mantén para hablar"
-                  >
-                    {isListening ? <Loader2 className="animate-spin" size={32} /> : <Play size={32} />}
-                  </button>
-                </div>
-                <p className="text-gray-400 font-bold flex items-center gap-2">
-                  <kbd className="px-2 py-1 bg-gray-100 rounded-md border shadow-sm">Espacio</kbd>
-                  o di "¡Listo!" para avanzar
-                </p>
-              </div>
+            {/* Los controles repetidos inferiores se pueden eliminar dado que la botonera anclada superior cumple el propósito principal. 
+                Dejaremos un recordatorio de teclado limpio en la parte inferior. */}
+            <div className="pt-8 border-t border-gray-100 mt-2 text-center w-full">
+              <p className="text-gray-400 font-bold flex flex-wrap items-center justify-center gap-2 text-sm">
+                Presiona <kbd className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg border shadow-sm font-sans mx-1">Espacio</kbd>
+                o di <span className="text-blue-500 bg-blue-50 px-3 py-1 rounded-full border border-blue-100">"¡Ya copié!"</span> por voz para continuar.
+              </p>
             </div>
           </div>
 
