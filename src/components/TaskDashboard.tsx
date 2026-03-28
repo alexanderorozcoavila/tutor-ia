@@ -11,7 +11,7 @@ import {
   Laptop, Tablet, Smartphone, MonitorX, Camera, ImageIcon
 } from "lucide-react";
 import { useDeviceDetect } from "@/hooks/useDeviceDetect";
-import { planService, PlanSemanal } from "@/lib/planService";
+import { planService, PlanSemanal, evalEstadoLMS } from "@/lib/planService";
 import { StudentPlanViewer } from "./StudentPlanViewer";
 
 interface Props {
@@ -40,7 +40,11 @@ export function TaskDashboard({ onStartTask }: Props) {
       // 1. Intentar cargar el Plan Semanal
       const plan = await planService.getPlanSemanalActivo(user.id).catch(() => null);
       if (plan) {
-        setActivePlan(plan);
+         if (evalEstadoLMS(plan.fecha_inicio) === 'active') {
+           setActivePlan(plan);
+         } else {
+           setActivePlan(null);
+         }
       }
 
       // 2. Cargar tareas (ya sea para fallback o para baseTasks del Plan)

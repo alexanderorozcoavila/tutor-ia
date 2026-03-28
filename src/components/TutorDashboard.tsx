@@ -6,6 +6,7 @@ import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
 import { TaskCreator } from "./TaskCreator";
 import { WeeklyPlanManager } from "./WeeklyPlanManager";
+import { ReviewBoard } from "./ReviewBoard";
 import { GlobalAssessmentBank } from "./GlobalAssessmentBank";
 import { Modal } from "./Modal";
 import { 
@@ -44,7 +45,7 @@ export function TutorDashboard() {
   const { showAlert } = useAlert();
   const { user: tutor } = useAuth();
   
-  const [mainTab, setMainTab] = useState<"mis_alumnos" | "banco">("mis_alumnos");
+  const [mainTab, setMainTab] = useState<"mis_alumnos" | "banco" | "revisiones">("mis_alumnos");
   const [students, setStudents] = useState<User[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<User | null>(null);
   const [showUserCreator, setShowUserCreator] = useState(false);
@@ -255,12 +256,18 @@ export function TutorDashboard() {
       </div>
 
       {/* Navegación Principal del Tutor */}
-      <div className="flex bg-gray-100 p-2 rounded-[2rem] border-4 border-gray-50 shadow-inner">
+      <div className="flex bg-gray-100 p-2 rounded-[2rem] border-4 border-gray-50 shadow-inner flex-col md:flex-row gap-2 md:gap-0">
         <button
           onClick={() => setMainTab("mis_alumnos")}
           className={`flex-1 flex flex-col items-center justify-center p-4 rounded-[1.5rem] font-black uppercase tracking-widest transition-all ${mainTab === "mis_alumnos" ? "bg-white text-indigo-700 shadow-md" : "text-gray-400 hover:bg-gray-200"}`}
         >
           <GraduationCap size={24} className="mb-2" /> Mis Alumnos
+        </button>
+        <button
+          onClick={() => setMainTab("revisiones")}
+          className={`flex-1 flex flex-col items-center justify-center p-4 rounded-[1.5rem] font-black uppercase tracking-widest transition-all ${mainTab === "revisiones" ? "bg-white text-amber-700 shadow-md border border-amber-100" : "text-gray-400 hover:bg-gray-200"}`}
+        >
+          <img src="https://api.iconify.design/lucide:clock.svg?color=%23d97706" className="w-6 h-6 mb-2 opacity-80" alt="Revisiones" /> Pendientes
         </button>
         <button
           onClick={() => setMainTab("banco")}
@@ -272,6 +279,8 @@ export function TutorDashboard() {
 
       {mainTab === "banco" ? (
         <GlobalAssessmentBank />
+      ) : mainTab === "revisiones" ? (
+        <ReviewBoard />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Lista de Alumnos */}

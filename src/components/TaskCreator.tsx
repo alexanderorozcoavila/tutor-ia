@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { useAuth } from "@/lib/AuthContext";
-import { planService } from "@/lib/planService";
+import { planService, PlanSemanal, evalEstadoLMS } from "@/lib/planService";
 import { useAlert } from "@/lib/AlertContext";
 
 interface Props {
@@ -38,16 +38,26 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   const [showRaw, setShowRaw] = useState(false);
 
   const { user } = useAuth();
-  const [activePlanId, setActivePlanId] = useState<string | null>(null);
+  const [availablePlans, setAvailablePlans] = useState<PlanSemanal[]>([]);
+  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   const [planDays, setPlanDays] = useState<number[]>([]);
 
   useEffect(() => {
     if (user && studentId) {
-      planService.getPlanSemanalActivo(studentId).then(plan => {
-        if (plan) setActivePlanId(plan.id);
-      }).catch(err => console.error("Error fetching plan:", err));
+      planService.getAllPlanesSemana(studentId).then(planes => {
+        // Filtrar solo planes activos o futuros (descartar expirados)
+        const validPlanes = planes.filter(p => evalEstadoLMS(p.fecha_inicio) !== 'expired');
+        setAvailablePlans(validPlanes);
+        // Preseleccionar el plan activo si existe por confort
+        const active = validPlanes.find(p => evalEstadoLMS(p.fecha_inicio) === 'active');
+        if (active) setSelectedPlanIds([active.id]);
+      }).catch(err => console.error("Error fetching plans:", err));
     }
   }, [user, studentId]);
+
+  const togglePlan = (id: string) => {
+    setSelectedPlanIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
 
   const toggleDay = (d: number) => {
     setPlanDays(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
@@ -107,14 +117,18 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
         metadata,
       });
 
-      if (type === "domestic" && activePlanId && planDays.length > 0 && studentId) {
-        await planService.cloneTaskToPlan(
-          activePlanId, 
-          createdTask.id, 
-          type, 
-          studentId, 
-          planDays, 
-          10 // 10 puntos por defecto
+      if (selectedPlanIds.length > 0 && planDays.length > 0 && studentId) {
+        await Promise.all(
+          selectedPlanIds.map(planId => 
+            planService.cloneTaskToPlan(
+              planId, 
+              createdTask.id, 
+              type, 
+              studentId, 
+              planDays, 
+              10 // 10 puntos por defecto
+            )
+          )
         );
       }
 
@@ -352,28 +366,64 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
           </div>
         )}
 
-        {type === "domestic" && activePlanId && (
+        {availablePlans.length > 0 && (
           <div className="space-y-4 animate-in slide-in-from-top-2 bg-emerald-50/30 p-6 rounded-[2rem] border-2 border-emerald-100">
             <label className="text-sm font-black text-gray-400 uppercase tracking-wider flex items-center gap-2">
-              <Calendar size={18} className="text-emerald-500" /> Repetir en Plan Semanal
+              <Calendar size={18} className="text-emerald-500" /> Programar en Plan Semanal
             </label>
-            <p className="text-xs text-emerald-600 mb-2 font-bold">Selecciona los días para asignar esta rutina automáticamente.</p>
-            <div className="flex gap-2 flex-wrap">
-              {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => toggleDay(i)}
-                  className={`px-4 py-2 rounded-xl font-bold transition-all ${
-                    planDays.includes(i) 
-                      ? 'bg-emerald-500 text-white shadow-md' 
-                      : 'bg-white text-gray-400 border-2 border-emerald-100 hover:bg-emerald-50'
-                  }`}
-                >
-                  {d}
-                </button>
-              ))}
+            
+            <div className="space-y-3 mb-6">
+              <p className="text-xs text-emerald-600 font-bold">1. Selecciona los planes destino:</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {availablePlans.map(plan => {
+                  const estado = evalEstadoLMS(plan.fecha_inicio);
+                  const isSelected = selectedPlanIds.includes(plan.id);
+                  return (
+                    <label 
+                      key={plan.id}
+                      className={`cursor-pointer flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${isSelected ? 'border-emerald-500 bg-emerald-50' : 'border-emerald-100 bg-white hover:border-emerald-300'}`}
+                    >
+                      <input 
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => togglePlan(plan.id)}
+                        className="w-5 h-5 accent-emerald-500 rounded text-emerald-600"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-gray-800">{plan.recompensa_nombre}</span>
+                        <span className="text-[10px] uppercase tracking-widest font-bold text-gray-400">
+                           {estado === 'active' ? 'Esta Semana' : 'Semana Futura'} • Inicia: {new Date(plan.fecha_inicio).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </label>
+                  );
+                })}
+              </div>
             </div>
+
+            {selectedPlanIds.length > 0 ? (
+              <div className="pt-4 border-t border-emerald-100">
+                <p className="text-xs text-emerald-600 mb-2 font-bold">2. Selecciona los días de aparición automática:</p>
+                <div className="flex gap-2 flex-wrap">
+                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleDay(i)}
+                      className={`px-4 py-2 rounded-xl font-bold transition-all ${
+                        planDays.includes(i) 
+                          ? 'bg-emerald-500 text-white shadow-md' 
+                          : 'bg-white text-gray-400 border-2 border-emerald-100 hover:bg-emerald-50'
+                      }`}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+               <p className="text-xs text-amber-600 italic font-bold">Selecciona al menos un plan arriba para programar días.</p>
+            )}
           </div>
         )}
 
