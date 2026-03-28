@@ -5,6 +5,7 @@ import { User, userService } from "@/lib/userService";
 import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
 import { TaskCreator } from "./TaskCreator";
+import { WeeklyPlanManager } from "./WeeklyPlanManager";
 import { GlobalAssessmentBank } from "./GlobalAssessmentBank";
 import { Modal } from "./Modal";
 import { 
@@ -330,11 +331,14 @@ export function TutorDashboard() {
                   </h3>
                   <button 
                     onClick={() => setShowTaskCreator(true)}
-                    className="flex items-center gap-2 px-6 py-3 bg-emerald-500 text-white rounded-xl font-black shadow-md hover:bg-emerald-600 transition-all active:scale-95"
+                    className="flex items-center gap-2 px-6 py-3 bg-indigo-500 text-white rounded-xl font-black shadow-md hover:bg-indigo-600 transition-all active:scale-95"
                   >
                     <Plus size={20} /> Asignar Tarea
                   </button>
                 </div>
+
+                {/* Plan Semanal (LMS) */}
+                <WeeklyPlanManager studentId={selectedStudent.id} />
 
                 <div className="space-y-8">
                   {/* Actividades Actuales */}

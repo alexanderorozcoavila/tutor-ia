@@ -11,6 +11,8 @@ import {
   Laptop, Tablet, Smartphone, MonitorX, Camera, ImageIcon
 } from "lucide-react";
 import { useDeviceDetect } from "@/hooks/useDeviceDetect";
+import { planService, PlanSemanal } from "@/lib/planService";
+import { StudentPlanViewer } from "./StudentPlanViewer";
 
 interface Props {
   onStartTask: (task: Task) => void;
@@ -26,6 +28,8 @@ export function TaskDashboard({ onStartTask }: Props) {
   const [activeUploadId, setActiveUploadId] = useState<string | null>(null);
   const currentDevice = useDeviceDetect();
 
+  const [activePlan, setActivePlan] = useState<PlanSemanal | null>(null);
+
   const isLocalMode = typeof window !== 'undefined' && 
     (!process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL.includes('TU_PROJECT_ID'));
 
@@ -33,6 +37,13 @@ export function TaskDashboard({ onStartTask }: Props) {
     if (!user) return;
     setIsLoading(true);
     try {
+      // 1. Intentar cargar el Plan Semanal
+      const plan = await planService.getPlanSemanalActivo(user.id).catch(() => null);
+      if (plan) {
+        setActivePlan(plan);
+      }
+
+      // 2. Cargar tareas (ya sea para fallback o para baseTasks del Plan)
       const data = await taskService.getTasks();
       setTasks(data.filter(t => t.assigned_to === user.id));
     } catch (err) {
@@ -100,6 +111,17 @@ export function TaskDashboard({ onStartTask }: Props) {
         <Loader2 className="text-indigo-500 animate-spin" size={48} />
         <p className="text-gray-400 font-bold">Cargando tus aventuras...</p>
       </div>
+    );
+  }
+
+  // BIFURCACIÓN LÓGICA (Modo Plan vs Modo Libre)
+  if (activePlan) {
+    return (
+      <StudentPlanViewer 
+        plan={activePlan}
+        onRefreshFallback={() => loadTasks()}
+        onStartModule={onStartTask}
+      />
     );
   }
 
