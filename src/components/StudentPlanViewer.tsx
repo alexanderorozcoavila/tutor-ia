@@ -192,7 +192,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
-      <div className="bg-white p-8 rounded-[2.5rem] shadow-xl border-4 border-emerald-50 relative overflow-hidden">
+      <div className="theme-card p-8 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-100/50 rounded-full blur-3xl -mr-20 -mt-20 pointer-events-none" />
         
         <div className="flex justify-between items-start relative z-10 flex-col md:flex-row gap-6">
@@ -200,10 +200,10 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
             <span className="px-4 py-1.5 bg-emerald-100 text-emerald-700 rounded-full text-xs font-black uppercase tracking-widest mb-4 inline-block">
               Plan de la Semana
             </span>
-            <h1 className="text-3xl font-black text-gray-900 mb-2">¡Cumple tu Meta!</h1>
+            <h1 className="text-3xl font-extrabold text-gray-900 mb-2">¡Cumple tu Meta!</h1>
             <p className="text-gray-500 font-bold text-lg flex items-center gap-2">
               <Gift size={20} className="text-amber-500" />
-              Recompensa: <span className="text-amber-600 font-black">{plan.recompensa_nombre}</span>
+              Recompensa: <span className="text-amber-600 font-extrabold">{plan.recompensa_nombre}</span>
             </p>
           </div>
 
@@ -253,10 +253,10 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
                 <div 
                   key={evalu.id}
                   onClick={() => !isCompletada && handleCardClick(evalu)}
-                  className={`group p-6 rounded-[2rem] border-4 transition-all flex items-center justify-between ${
+                  className={`group p-6 theme-card transition-all flex items-center justify-between ${
                     isCompletada 
-                    ? "bg-purple-50/50 border-purple-100 opacity-70" 
-                    : "bg-white border-white shadow-lg cursor-pointer hover:border-purple-200 active:scale-[0.98]"
+                    ? "opacity-70 grayscale" 
+                    : "cursor-pointer active:scale-[0.98]"
                   }`}
                 >
                    <div className="flex items-center gap-4">
@@ -264,7 +264,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
                         <ClipboardSignature size={28} />
                       </div>
                       <div>
-                        <h4 className={`text-xl font-black ${isCompletada ? 'text-purple-900 line-through' : 'text-gray-800'}`}>
+                        <h4 className={`text-xl font-extrabold ${isCompletada ? 'text-purple-900 line-through' : 'text-gray-800'}`}>
                           {isCompletada ? "Evaluación Realizada" : "Evaluación Semanal"}
                         </h4>
                         <p className="text-purple-500 font-bold text-xs uppercase">+{evalu.puntos_valor} puntos</p>
@@ -295,15 +295,15 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
                 <div 
                   key={tarea.id}
                   onClick={() => handleCardClick(tarea)}
-                  className="group cursor-pointer bg-white p-6 rounded-[2rem] border-4 border-white shadow-lg hover:border-emerald-200 transition-all active:scale-[0.98] flex items-center justify-between"
+                  className="group cursor-pointer theme-card p-6 transition-all active:scale-[0.98] flex items-center justify-between"
                 >
                   <div className="flex items-center gap-6">
                     <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 shadow-inner group-hover:scale-110 transition-transform">
                       {tarea.tipo_modulo === 'dictation' || tarea.tipo_modulo === 'reading' ? <Loader2 size={32} /> : <CheckCircle2 size={32} />} 
                     </div>
                     <div>
-                      <h4 className="text-2xl font-black text-gray-800">{baseTask ? baseTask.title : "Rutina de Hoy"}</h4>
-                      <p className="text-emerald-500 font-black text-sm uppercase tracking-wider">+{tarea.puntos_valor} puntos</p>
+                      <h4 className="text-2xl font-extrabold text-gray-800">{baseTask ? baseTask.title : "Rutina de Hoy"}</h4>
+                      <p className="text-emerald-500 font-bold text-sm uppercase tracking-wider">+{tarea.puntos_valor} puntos</p>
                     </div>
                   </div>
                   <div className="w-14 h-14 bg-gray-50 border-4 border-gray-100 rounded-full flex items-center justify-center group-hover:bg-emerald-50 group-hover:border-emerald-200 transition-colors" />

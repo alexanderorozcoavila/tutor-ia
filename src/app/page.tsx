@@ -111,10 +111,8 @@ function AppContent() {
 
 export default function Home() {
   return (
-    <AuthProvider>
-      <FullScreenWrapper>
-        <AppContent />
-      </FullScreenWrapper>
-    </AuthProvider>
+    <FullScreenWrapper>
+      <AppContent />
+    </FullScreenWrapper>
   );
 }

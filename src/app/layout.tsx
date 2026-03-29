@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Comic_Neue } from "next/font/google";
+import { Comic_Neue, Press_Start_2P, Bangers } from "next/font/google";
 import "./globals.css";
 
 const comicNeue = Comic_Neue({
@@ -8,8 +8,21 @@ const comicNeue = Comic_Neue({
   variable: "--font-comic-neue",
 });
 
+const pixelFont = Press_Start_2P({
+  weight: ["400"],
+  subsets: ["latin"],
+  variable: "--font-pixel",
+});
+
+const comicFont = Bangers({
+  weight: ["400"],
+  subsets: ["latin"],
+  variable: "--font-comic",
+});
+
 import { AlertProvider } from "@/lib/AlertContext";
 import { AuthProvider } from "@/lib/AuthContext";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { SessionProvider } from "@/components/SessionProvider";
 
 export const metadata: Metadata = {
@@ -23,13 +36,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${comicNeue.variable} h-full antialiased`}>
+    <html lang="es" className={`${comicNeue.variable} ${pixelFont.variable} ${comicFont.variable} h-full antialiased`}>
       <body className="font-sans min-h-full flex flex-col bg-slate-50">
         <AlertProvider>
           <AuthProvider>
-            <SessionProvider>
-              {children}
-            </SessionProvider>
+            <ThemeProvider>
+              <SessionProvider>
+                {children}
+              </SessionProvider>
+            </ThemeProvider>
           </AuthProvider>
         </AlertProvider>
       </body>

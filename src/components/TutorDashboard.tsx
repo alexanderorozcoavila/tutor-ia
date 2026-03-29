@@ -82,6 +82,10 @@ export function TutorDashboard() {
   const [newPassword, setNewPassword] = useState("");
   const [availableStudents, setAvailableStudents] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<"create" | "assign">("create");
+  const [themes, setThemes] = useState<any[]>([]);
+  const [selectedThemeId, setSelectedThemeId] = useState<string>("");
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [studentToTheme, setStudentToTheme] = useState<User | null>(null);
 
   const loadData = async () => {
     if (!tutor) return;
@@ -121,8 +125,19 @@ export function TutorDashboard() {
     }
   };
 
+  const loadThemes = async () => {
+    try {
+      const all = await userService.getAvailableThemes();
+      setThemes(all);
+      if (all.length > 0) setSelectedThemeId(all[0].id);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   useEffect(() => {
     loadData();
+    loadThemes();
   }, [tutor]);
 
   useEffect(() => {
@@ -139,7 +154,8 @@ export function TutorDashboard() {
         username: newUsername,
         password: newPassword,
         role: "student",
-        created_by: tutor.id
+        created_by: tutor.id,
+        theme_id: selectedThemeId || undefined
       });
       setNewUsername("");
       setNewPassword("");
@@ -236,6 +252,22 @@ export function TutorDashboard() {
       await planService.deleteTareaPlanificada(id);
       if (selectedStudent) loadStudentTasks(selectedStudent.id);
       showAlert("Evaluación eliminada del plan", { type: "success" });
+    } catch (err: any) {
+      showAlert(err.message, { type: "error" });
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleUpdateStudentTheme = async () => {
+    if (!studentToTheme || !selectedThemeId) return;
+    setIsActionLoading(true);
+    try {
+      await userService.updateUserTheme(studentToTheme.id, selectedThemeId);
+      setIsThemeModalOpen(false);
+      setStudentToTheme(null);
+      loadData();
+      showAlert("Estilo visual actualizado", { type: "success" });
     } catch (err: any) {
       showAlert(err.message, { type: "error" });
     } finally {
@@ -354,6 +386,17 @@ export function TutorDashboard() {
                           className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-600"
                         >
                           <Settings2 size={14} className="inline mr-1" /> Clave
+                        </button>
+                        <button 
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setStudentToTheme(s);
+                            setSelectedThemeId(s.theme_id || "");
+                            setIsThemeModalOpen(true);
+                          }}
+                          className="text-[10px] font-black uppercase text-emerald-400 hover:text-emerald-600"
+                        >
+                          <Star size={14} className="inline mr-1" /> Estilo
                         </button>
                         <button 
                           onClick={(e) => { e.stopPropagation(); handleDeleteStudent(s); }}
@@ -653,6 +696,24 @@ export function TutorDashboard() {
                   placeholder="Contraseña sugerida"
                   className="w-full p-4 rounded-xl bg-gray-50 border-2 border-transparent focus:border-indigo-200 outline-none font-bold"
                 />
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Tema Visual</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {themes.map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSelectedThemeId(t.id)}
+                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 ${
+                          selectedThemeId === t.id ? "border-indigo-500 bg-indigo-50 scale-105" : "border-gray-100 bg-gray-50 opacity-60 hover:opacity-100"
+                        }`}
+                      >
+                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: t.config?.primary || '#ccc' }}></div>
+                        <span className="text-[10px] font-black uppercase">{t.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex gap-4">
                   <button 
                     type="button"
@@ -922,6 +983,42 @@ export function TutorDashboard() {
               {isActionLoading ? <Loader2 className="animate-spin" /> : "Sí, Eliminar"}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isThemeModalOpen}
+        onClose={() => {
+          setIsThemeModalOpen(false);
+          setStudentToTheme(null);
+        }}
+        title="Cambiar Estilo Visual"
+      >
+        <div className="space-y-6">
+          <p className="text-gray-500 font-bold">Selecciona el nuevo tema para <span className="text-indigo-600">@{studentToTheme?.username}</span></p>
+          <div className="grid grid-cols-2 gap-3">
+            {themes.map(t => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setSelectedThemeId(t.id)}
+                className={`p-4 rounded-2xl border-4 transition-all flex flex-col items-center gap-2 ${
+                  selectedThemeId === t.id ? "border-indigo-500 bg-indigo-50 scale-105 shadow-md" : "border-gray-100 bg-gray-50 opacity-60 hover:opacity-100"
+                }`}
+              >
+                <div className="w-8 h-8 rounded-full shadow-inner" style={{ backgroundColor: t.config?.primary || '#ccc' }}></div>
+                <span className="font-black text-xs uppercase">{t.name}</span>
+              </button>
+            ))}
+          </div>
+          <button 
+            type="button"
+            onClick={handleUpdateStudentTheme}
+            disabled={isActionLoading || !selectedThemeId}
+            className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black shadow-lg hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isActionLoading ? <Loader2 className="animate-spin" /> : "Actualizar Estilo"}
+          </button>
         </div>
       </Modal>
 

@@ -17,11 +17,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const saved = localStorage.getItem("ia_tutor_session");
-    if (saved) {
-      setUser(JSON.parse(saved));
-    }
-    setIsLoading(false);
+    const initAuth = async () => {
+      const saved = localStorage.getItem("ia_tutor_session");
+      if (saved) {
+        const savedUser = JSON.parse(saved);
+        setUser(savedUser);
+        
+        // Refresco en segundo plano para obtener el tema más reciente
+        try {
+          const freshProfile = await userService.getUserProfile(savedUser.id);
+          if (freshProfile) {
+            setUser(freshProfile);
+            localStorage.setItem("ia_tutor_session", JSON.stringify(freshProfile));
+          }
+        } catch (err) {
+          console.error("Error refrescando perfil:", err);
+        }
+      }
+      setIsLoading(false);
+    };
+
+    initAuth();
   }, []);
 
   const login = async (username: string, password: string) => {

@@ -8,6 +8,11 @@ export interface User {
   role: UserRole;
   password?: string;
   created_by?: string;
+  theme_id?: string;
+  theme?: {
+    slug: string;
+    config: any;
+  };
 }
 
 export interface TutorStudentRelation {
@@ -62,9 +67,39 @@ export const userService = {
 
     const { data, error } = await supabase
       .from('users')
-      .select('*')
+      .select('*, theme:theme_id(slug, config)')
       .eq('username', username)
       .eq('password', password)
+      .single();
+    
+    if (error) return null;
+    const user = data as User;
+    
+    if (user && !isSupabaseConfigured && user.theme_id) {
+      const themes = await this.getAvailableThemes();
+      const theme = themes.find(t => t.id === user.theme_id);
+      if (theme) user.theme = { slug: theme.slug, config: theme.config };
+    }
+    
+    return user;
+  },
+
+  async getUserProfile(id: string): Promise<User | null> {
+    if (!isSupabaseConfigured) {
+      const users = getLocalUsers();
+      const user = users.find(u => u.id === id);
+      if (user && user.theme_id) {
+        const themes = await this.getAvailableThemes();
+        const theme = themes.find(t => t.id === user.theme_id);
+        if (theme) user.theme = { slug: theme.slug, config: theme.config };
+      }
+      return user || null;
+    }
+
+    const { data, error } = await supabase
+      .from('users')
+      .select('*, theme:theme_id(slug, config)')
+      .eq('id', id)
       .single();
     
     if (error) return null;
@@ -84,6 +119,7 @@ export const userService = {
         password: user.password || '123456',
         role: user.role || 'student',
         created_by: user.created_by,
+        theme_id: user.theme_id
       };
       saveLocalUsers([...users, newUser]);
       
@@ -96,7 +132,13 @@ export const userService = {
     } else {
       const { data, error } = await supabase
         .from('users')
-        .insert([user])
+        .insert([{
+          username: user.username,
+          password: user.password,
+          role: user.role,
+          created_by: user.created_by,
+          theme_id: user.theme_id
+        }])
         .select();
       
       if (error) throw error;
@@ -122,11 +164,87 @@ export const userService = {
 
     const { data, error } = await supabase
       .from('tutor_students')
-      .select('student:student_id(*)')
+      .select('student:student_id(*, theme:theme_id(slug, config))')
       .eq('tutor_id', tutorId);
     
     if (error) throw error;
     return (data as any[]).map(d => d.student) as User[];
+  },
+
+  async getAvailableThemes() {
+    const DEFAULT_THEMES = [
+      { id: 'e0e0e0e0-e0e0-e0e0-e0e0-e0e0e0e0e0e0', name: 'Original', slug: 'base', config: { primary: '#6366f1', secondary: '#818cf8', background: '#fdfbf7', surface: '#ffffff', border: '1px', radius: '1rem', font: 'var(--font-comic-neue)', bgOpacity: 1 } },
+      { id: 'b10c202a-1111-4444-8888-000000000001', name: 'Minecraft', slug: 'minecraft', config: { primary: '#2d6a4f', secondary: '#795548', background: '#F0F9FF', surface: '#ffffff', border: '4px', radius: '0px', font: 'var(--font-pixel)', bgOpacity: 0.1 } },
+      { id: 'b10c202a-2222-4444-8888-000000000002', name: 'Sonic', slug: 'sonic', config: { primary: '#1d4ed8', secondary: '#fbbf24', background: '#EFF6FF', surface: '#ffffff', border: '2px', radius: '30px', font: 'var(--font-comic)', bgOpacity: 0.05 } },
+      { id: 'b10c202a-3333-4444-8888-000000000003', name: 'Marvel', slug: 'marvel', config: { primary: '#dc2626', secondary: '#fbbf24', background: '#ffffff', surface: '#ffffff', border: '3px', radius: '4px', font: 'var(--font-comic)', bgOpacity: 0.03 } }
+    ];
+
+    if (!isSupabaseConfigured) {
+      const saved = localStorage.getItem('ia_tutor_themes');
+      const customThemes = saved ? JSON.parse(saved) : [];
+      return [...DEFAULT_THEMES, ...customThemes];
+    }
+    const { data, error } = await supabase.from('themes').select('*').order('name');
+    if (error) throw error;
+    return data && data.length > 0 ? data : DEFAULT_THEMES;
+  },
+
+  async createTheme(theme: { name: string, slug: string, config: any }) {
+    if (!isSupabaseConfigured) {
+      const saved = localStorage.getItem('ia_tutor_themes');
+      const themes = saved ? JSON.parse(saved) : [];
+      const newTheme = { ...theme, id: Math.random().toString(36).substr(2, 9) };
+      localStorage.setItem('ia_tutor_themes', JSON.stringify([...themes, newTheme]));
+      return newTheme;
+    }
+    const { data, error } = await supabase.from('themes').insert([theme]).select();
+    if (error) throw error;
+    return data[0];
+  },
+
+  async updateUserTheme(userId: string, themeId: string) {
+    if (!isSupabaseConfigured) {
+      const users = getLocalUsers();
+      const index = users.findIndex(u => u.id === userId);
+      if (index !== -1) {
+        users[index].theme_id = themeId;
+        // Reiniciar el objeto theme para que se resuelva en el próximo login/recarga
+        delete users[index].theme;
+        saveLocalUsers(users);
+        
+        // Si es el usuario actual, actualizar la sesión
+        const session = localStorage.getItem('ia_tutor_session');
+        if (session) {
+          const sessionUser = JSON.parse(session);
+          if (sessionUser.id === userId) {
+            sessionUser.theme_id = themeId;
+            const themes = await this.getAvailableThemes();
+            const theme = themes.find(t => t.id === themeId);
+            if (theme) sessionUser.theme = { slug: theme.slug, config: theme.config };
+            localStorage.setItem('ia_tutor_session', JSON.stringify(sessionUser));
+          }
+        }
+        return;
+      }
+      throw new Error("Usuario no encontrado");
+    }
+
+    const { error } = await supabase
+      .from('users')
+      .update({ theme_id: themeId })
+      .eq('id', userId);
+    
+    if (error) throw error;
+
+    // Si es el usuario actual, refrescar sesión local (útil para pruebas en misma pestaña)
+    const session = localStorage.getItem('ia_tutor_session');
+    if (session) {
+      const sessionUser = JSON.parse(session);
+      if (sessionUser.id === userId) {
+        const updated = await this.getUserProfile(userId);
+        if (updated) localStorage.setItem('ia_tutor_session', JSON.stringify(updated));
+      }
+    }
   },
 
   async assignStudentToTutor(tutorId: string, studentId: string) {

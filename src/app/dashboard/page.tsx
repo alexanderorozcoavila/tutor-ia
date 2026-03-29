@@ -26,33 +26,33 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
         {/* Stats Cards */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4">
+        <div className="theme-card p-6 flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center text-blue-600">
             <Trophy size={24} />
           </div>
           <div>
-            <p className="text-gray-500 font-medium">XP Total Acumulada</p>
-            <p className="text-2xl font-bold text-gray-900">{xp} puntos</p>
+            <p className="text-gray-500 font-medium font-sans uppercase text-[10px] tracking-widest">XP Total Acumulada</p>
+            <p className="text-2xl font-black text-gray-900">{xp} puntos</p>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4">
+        <div className="theme-card p-6 flex items-center gap-4">
           <div className="w-12 h-12 bg-green-100 rounded-2xl flex items-center justify-center text-green-600">
             <Clock size={24} />
           </div>
           <div>
-            <p className="text-gray-500 font-medium">Tiempo de Práctica</p>
-            <p className="text-2xl font-bold text-gray-900">15 min hoy</p>
+            <p className="text-gray-500 font-medium font-sans uppercase text-[10px] tracking-widest">Tiempo de Práctica</p>
+            <p className="text-2xl font-black text-gray-900">15 min hoy</p>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex items-center gap-4">
+        <div className="theme-card p-6 flex items-center gap-4">
           <div className="w-12 h-12 bg-purple-100 rounded-2xl flex items-center justify-center text-purple-600">
             <AlertCircle size={24} />
           </div>
           <div>
-            <p className="text-gray-500 font-medium">Estado de Alerta</p>
-            <p className="text-2xl font-bold text-green-600">Todo bien 👍</p>
+            <p className="text-gray-500 font-medium font-sans uppercase text-[10px] tracking-widest">Estado de Alerta</p>
+            <p className="text-2xl font-black text-green-600">Todo bien 👍</p>
           </div>
         </div>
       </div>

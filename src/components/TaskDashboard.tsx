@@ -142,24 +142,20 @@ export function TaskDashboard({ onStartTask }: Props) {
       />
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] shadow-xl border-2 border-indigo-50">
+      <div className="theme-card flex flex-col md:flex-row items-center justify-between gap-6 p-8">
         <div className="flex items-center gap-6">
           <div className="w-20 h-20 bg-gradient-to-tr from-yellow-400 to-orange-500 rounded-3xl flex items-center justify-center text-white shadow-lg">
             <Star size={40} fill="currentColor" />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-gray-900">¡Hola, Pequeño Aventurero!</h1>
+            <h1 className="text-3xl font-extrabold text-gray-900 leading-tight">¡Hola, Pequeño Aventurero!</h1>
             <p className="text-gray-500 font-bold text-lg">Tienes {tasks.filter(t => t.status === "pending").length} tareas pendientes hoy.</p>
             {isLocalMode && (
               <span className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full mt-2">
-                <DatabaseZap size={12} /> MODO LOCAL (Sin configurar DB)
+                <DatabaseZap size={12} /> MODO LOCAL
               </span>
             )}
           </div>
-        </div>
-        
-        <div className="flex gap-3">
-          {/* Botón de configuración removido para el alumno */}
         </div>
       </div>
 
@@ -170,7 +166,7 @@ export function TaskDashboard({ onStartTask }: Props) {
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center text-indigo-400">
               <Clock size={40} />
             </div>
-            <h3 className="text-2xl font-black text-indigo-900">¡Todo al día!</h3>
+            <h3 className="text-2xl font-extrabold text-indigo-900">¡Todo al día!</h3>
             <p className="text-indigo-400 font-bold">No tienes aventuras pendientes por ahora.</p>
           </div>
         ) : (
@@ -182,12 +178,12 @@ export function TaskDashboard({ onStartTask }: Props) {
 
             return (
               <div key={task.id} className={`
-                group relative flex flex-col gap-0 rounded-[2rem] border-4 transition-all overflow-hidden
+                group relative flex flex-col gap-0 transition-all overflow-hidden theme-card
                 ${task.status === "completed" || task.status === "failed"
-                  ? "bg-amber-50 border-amber-100 opacity-90" 
+                  ? "bg-amber-50 opacity-90 border-amber-200" 
                   : !isSupported
                   ? "bg-gray-50 border-gray-200 opacity-60"
-                  : "bg-white border-white shadow-lg hover:border-indigo-200"
+                  : ""
                 }
               `}>
                 {/* Fila principal de la tarea */}
@@ -203,7 +199,7 @@ export function TaskDashboard({ onStartTask }: Props) {
                       {task.type === "dictation" ? <BookOpen size={32} /> : <Home size={32} />}
                     </div>
                     <div>
-                      <h3 className={`text-xl font-black ${task.status === "completed" ? "text-amber-700" : !isSupported ? "text-gray-500" : "text-gray-900"}`}>
+                      <h3 className={`text-xl font-extrabold ${task.status === "completed" ? "text-amber-700" : !isSupported ? "text-gray-500" : "text-gray-900"}`}>
                         {task.title}
                       </h3>
                       <div className="flex items-center gap-4 text-sm font-bold mt-1 text-gray-400">
@@ -243,7 +239,7 @@ export function TaskDashboard({ onStartTask }: Props) {
                 {/* Sección de foto de evidencia (solo en tareas completadas/failed, no aprobadas/rechazadas) */}
                 {canAttachPhoto && (
                   <div className="px-6 pb-6 border-t-2 border-amber-100 pt-4">
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                       <ImageIcon size={12} /> Foto de evidencia
                     </p>
                     <div className="flex items-center gap-4 flex-wrap">
@@ -292,7 +288,7 @@ export function TaskDashboard({ onStartTask }: Props) {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {tasks.filter(t => t.status === 'approved').map(task => (
-              <div key={task.id} className="bg-white/50 p-6 rounded-[2rem] border-2 border-emerald-100 flex items-center justify-between shadow-sm">
+              <div key={task.id} className="theme-card p-6 flex items-center justify-between border-emerald-100 bg-emerald-50/20 shadow-sm">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
                     <Star size={24} fill="currentColor" />
