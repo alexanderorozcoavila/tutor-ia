@@ -204,6 +204,21 @@ export const rewardService = {
   },
 
   /**
+   * Devuelve la lista de recompensa_diaria_id que el alumno ya activó hoy.
+   * Usado al cargar la pantalla para pre-poblar el estado "ya usado".
+   * Incluye tanto los en-curso como los completados para bloquear el botón en ambos casos.
+   */
+  async getUsosRecompensaHoy(recompensaDiariaIds: string[], alumnoId: string): Promise<string[]> {
+    if (LS_MODE || recompensaDiariaIds.length === 0) return [];
+    const { data } = await supabase
+      .from('uso_recompensa')
+      .select('recompensa_diaria_id')
+      .in('recompensa_diaria_id', recompensaDiariaIds)
+      .eq('alumno_id', alumnoId);
+    return (data || []).map((r: any) => r.recompensa_diaria_id);
+  },
+
+  /**
    * Activa la recompensa: crea uso_recompensa y señaliza control_dispositivo.
    * Usa la función SQL activar_recompensa para atomicidad.
    */

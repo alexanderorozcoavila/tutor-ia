@@ -114,7 +114,7 @@ function RewardCard({ rd, currentLevel, isActivated, isActivating, onActivar, ne
               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
                 <CheckCircle2 size={24} className="text-emerald-500" />
               </div>
-              <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">En uso</p>
+              <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Usada hoy</p>
             </div>
           ) : (
             <button
@@ -223,6 +223,13 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
       const rds = await rewardService.getRecompensasDiarias(plan.id);
       const hoyRDs = rds.filter(rd => rd.dia_semana === today);
       setRecompensasDelDia(hoyRDs as any);
+
+      // Cargar usos ya existentes desde BD → evita re-activación tras recarga de página
+      if (user && hoyRDs.length > 0) {
+        const rdIds = hoyRDs.map(rd => rd.id);
+        const usadas = await rewardService.getUsosRecompensaHoy(rdIds, user.id);
+        setActivatedRecompensas(new Set(usadas));
+      }
     } catch (e) {
       console.error("Error loading recompensas:", e);
     }
