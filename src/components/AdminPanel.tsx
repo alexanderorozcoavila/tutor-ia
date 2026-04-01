@@ -6,6 +6,7 @@ import { settingsService } from "@/lib/settingsService";
 import { lmsService, Subject } from "@/lib/lmsService";
 import { rewardService, Recompensa } from "@/lib/rewardService";
 import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon, Monitor, UserCheck } from "lucide-react";
+import { systemMenuService, MenuAccionCompleta } from "@/lib/systemMenuService";
 import { Modal } from "./Modal";
 import { useAlert } from "@/lib/AlertContext";
 
@@ -17,7 +18,7 @@ export function AdminPanel() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"tutor" | "admin">("tutor");
   const [isCreating, setIsCreating] = useState(false);
-  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "settings">("users");
+  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "menu" | "settings">("users");
   const [themes, setThemes] = useState<any[]>([]);
   const [isThemesLoading, setIsThemesLoading] = useState(false);
 
@@ -59,6 +60,17 @@ export function AdminPanel() {
   const [currentDeviceAlumnoId, setCurrentDeviceAlumnoId] = useState<string | null>(null);
   const [isSavingDevice, setIsSavingDevice] = useState(false);
   const [isDeviceLoading, setIsDeviceLoading] = useState(false);
+
+  // Menú del Sistema
+  const [menuAcciones, setMenuAcciones] = useState<MenuAccionCompleta[]>([]);
+  const [isMenuLoading, setIsMenuLoading] = useState(false);
+  const [editingAccion, setEditingAccion] = useState<MenuAccionCompleta | null>(null);
+  const [menuForm, setMenuForm] = useState({
+    nombre: "", descripcion: "", icono_emoji: "⚙️",
+    comando: "", requiere_sudo: false, orden: 0, activo: true,
+    roles: [] as string[]
+  });
+  const [isSavingAccion, setIsSavingAccion] = useState(false);
 
   // Modal de Asignación a Tutor
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -207,6 +219,57 @@ export function AdminPanel() {
     }
   };
 
+  // ── Menú del Sistema: funciones ─────────────────────────────────────────────
+  const loadMenuAcciones = async () => {
+    setIsMenuLoading(true);
+    try {
+      const data = await systemMenuService.getAllAcciones();
+      setMenuAcciones(data);
+    } catch (e) {
+      console.error("Error cargando menu_acciones:", e);
+    } finally {
+      setIsMenuLoading(false);
+    }
+  };
+
+  const handleSaveAccion = async () => {
+    setIsSavingAccion(true);
+    try {
+      if (editingAccion) {
+        await systemMenuService.updateAccion(editingAccion.id, menuForm);
+        showAlert("Acción actualizada", { type: "success" });
+      } else {
+        await systemMenuService.createAccion(menuForm);
+        showAlert("Acción creada", { type: "success" });
+      }
+      setEditingAccion(null);
+      setMenuForm({ nombre: "", descripcion: "", icono_emoji: "⚙️", comando: "", requiere_sudo: false, orden: 0, activo: true, roles: [] });
+      loadMenuAcciones();
+    } catch (err: any) {
+      showAlert(err.message || "Error guardando acción", { type: "error" });
+    } finally {
+      setIsSavingAccion(false);
+    }
+  };
+
+  const handleEditAccion = (a: MenuAccionCompleta) => {
+    setEditingAccion(a);
+    setMenuForm({ nombre: a.nombre, descripcion: a.descripcion || "", icono_emoji: a.icono_emoji, comando: a.comando, requiere_sudo: a.requiere_sudo, orden: a.orden, activo: a.activo, roles: a.roles });
+    setActiveMainTab("menu");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleDeleteAccion = async (id: string) => {
+    if (!confirm("¿Eliminar esta acción del menú?")) return;
+    try {
+      await systemMenuService.deleteAccion(id);
+      showAlert("Acción eliminada", { type: "success" });
+      loadMenuAcciones();
+    } catch (err: any) {
+      showAlert(err.message || "Error eliminando acción", { type: "error" });
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadSettings();
@@ -214,6 +277,7 @@ export function AdminPanel() {
     loadThemes();
     loadRecompensas();
     loadDeviceConfig();
+    loadMenuAcciones();
   }, []);
 
   const handleUpdateSettings = async () => {
@@ -382,6 +446,12 @@ export function AdminPanel() {
           className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "themes" ? "bg-white text-indigo-600 shadow-md" : "text-indigo-400 hover:text-indigo-600"}`}
         >
           Temas
+        </button>
+        <button
+          onClick={() => setActiveMainTab("menu")}
+          className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "menu" ? "bg-white text-cyan-600 shadow-md" : "text-indigo-400 hover:text-cyan-500"}`}
+        >
+          🖥️ Menú
         </button>
         <button 
           onClick={() => setActiveMainTab("settings")}
@@ -973,6 +1043,128 @@ export function AdminPanel() {
                 <p className="text-[10px] text-cyan-400/60 font-bold text-center">
                   ⚠️ Después de cambiar el alumno, reinicia el agente: <code className="bg-white/10 px-1.5 py-0.5 rounded">sudo systemctl restart ia-tutor-agente</code>
                 </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── TAB: Menú del Sistema ─────────────────────────────────── */}
+      {activeMainTab === "menu" && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 space-y-6">
+          <div className="bg-gradient-to-br from-gray-900 to-cyan-900 p-8 rounded-[2.5rem] shadow-xl text-white">
+            <h2 className="text-2xl font-black mb-2 flex items-center gap-3">
+              <Monitor className="text-cyan-400" size={24} /> Menú del Sistema
+            </h2>
+            <p className="text-cyan-300 text-sm font-bold mb-6">Crea acciones del sistema operativo y define qué roles pueden verlas.</p>
+
+            {/* Formulario crear/editar */}
+            <div className="bg-white/10 rounded-2xl p-6 space-y-4">
+              <h3 className="font-black text-lg text-white">
+                {editingAccion ? `✏️ Editando: ${editingAccion.nombre}` : "+ Nueva Acción"}
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <input value={menuForm.icono_emoji} onChange={e => setMenuForm(f => ({ ...f, icono_emoji: e.target.value }))}
+                  placeholder="Emoji" className="bg-white/10 p-3 rounded-xl border border-white/20 text-white text-center text-2xl col-span-1 w-full" />
+                <input value={menuForm.nombre} onChange={e => setMenuForm(f => ({ ...f, nombre: e.target.value }))}
+                  placeholder="Nombre de la acción" className="bg-white/10 p-3 rounded-xl border border-white/20 text-white font-bold col-span-1" />
+              </div>
+              <input value={menuForm.descripcion} onChange={e => setMenuForm(f => ({ ...f, descripcion: e.target.value }))}
+                placeholder="Descripción (opcional)" className="w-full bg-white/10 p-3 rounded-xl border border-white/20 text-white text-sm" />
+              <input value={menuForm.comando} onChange={e => setMenuForm(f => ({ ...f, comando: e.target.value }))}
+                placeholder="Comando del SO (ej: shutdown -h now)" className="w-full bg-white/10 p-3 rounded-xl border border-white/20 text-white font-mono text-sm" />
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={menuForm.requiere_sudo} onChange={e => setMenuForm(f => ({ ...f, requiere_sudo: e.target.checked }))}
+                    className="w-4 h-4 accent-red-400" />
+                  <span className="text-sm font-bold text-red-300">Requiere sudo</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={menuForm.activo} onChange={e => setMenuForm(f => ({ ...f, activo: e.target.checked }))}
+                    className="w-4 h-4 accent-emerald-400" />
+                  <span className="text-sm font-bold text-emerald-300">Activo</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-cyan-300 font-bold">Orden:</span>
+                  <input type="number" value={menuForm.orden} onChange={e => setMenuForm(f => ({ ...f, orden: parseInt(e.target.value) || 0 }))}
+                    className="w-16 bg-white/10 p-2 rounded-lg border border-white/20 text-white text-center text-sm" />
+                </div>
+              </div>
+
+              {/* Roles visibles */}
+              <div>
+                <p className="text-xs font-black text-cyan-300 uppercase tracking-widest mb-2">Visible para:</p>
+                <div className="flex gap-4">
+                  {(['admin', 'tutor', 'student'] as const).map(rol => (
+                    <label key={rol} className="flex items-center gap-2 cursor-pointer">
+                      <input type="checkbox"
+                        checked={menuForm.roles.includes(rol)}
+                        onChange={e => setMenuForm(f => ({
+                          ...f,
+                          roles: e.target.checked ? [...f.roles, rol] : f.roles.filter(r => r !== rol)
+                        }))}
+                        className="w-4 h-4 accent-cyan-400" />
+                      <span className="text-sm font-bold text-white capitalize">{rol === 'student' ? 'Alumno' : rol === 'tutor' ? 'Tutor' : 'Admin'}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button onClick={handleSaveAccion} disabled={isSavingAccion || !menuForm.nombre || !menuForm.comando}
+                  className="flex-1 py-3 bg-cyan-500 hover:bg-cyan-400 text-white rounded-xl font-black transition-all flex items-center justify-center gap-2 disabled:opacity-40">
+                  {isSavingAccion ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                  {editingAccion ? 'Guardar Cambios' : 'Crear Acción'}
+                </button>
+                {editingAccion && (
+                  <button onClick={() => { setEditingAccion(null); setMenuForm({ nombre: '', descripcion: '', icono_emoji: '⚙️', comando: '', requiere_sudo: false, orden: 0, activo: true, roles: [] }); }}
+                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-black transition-all">
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Lista de acciones */}
+          <div className="bg-white rounded-[2.5rem] shadow-lg border-2 border-gray-50 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-lg font-black text-gray-800">Acciones configuradas</h3>
+              {isMenuLoading && <Loader2 className="animate-spin text-cyan-500" size={18} />}
+            </div>
+            {menuAcciones.length === 0 ? (
+              <div className="p-12 text-center text-gray-400">
+                <Monitor size={40} className="mx-auto mb-3 opacity-30" />
+                <p className="font-bold">No hay acciones creadas aún</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-50">
+                {menuAcciones.map(a => (
+                  <div key={a.id} className={`flex items-center gap-4 p-5 hover:bg-gray-50 transition-colors ${!a.activo ? 'opacity-50' : ''}`}>
+                    <span className="text-2xl flex-shrink-0">{a.icono_emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-gray-800">{a.nombre}</p>
+                      <p className="text-xs font-mono text-gray-400 truncate">{a.comando}</p>
+                      <div className="flex gap-1.5 mt-1 flex-wrap">
+                        {a.requiere_sudo && <span className="text-[10px] bg-red-100 text-red-600 font-black px-2 py-0.5 rounded-full">SUDO</span>}
+                        {!a.activo && <span className="text-[10px] bg-gray-200 text-gray-500 font-black px-2 py-0.5 rounded-full">INACTIVO</span>}
+                        {a.roles.map(r => (
+                          <span key={r} className="text-[10px] bg-cyan-100 text-cyan-700 font-black px-2 py-0.5 rounded-full capitalize">
+                            {r === 'student' ? 'Alumno' : r === 'tutor' ? 'Tutor' : 'Admin'}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEditAccion(a)} className="p-2 rounded-xl bg-cyan-50 text-cyan-600 hover:bg-cyan-100 transition-colors">
+                        <Pencil size={16} />
+                      </button>
+                      <button onClick={() => handleDeleteAccion(a.id)} className="p-2 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 transition-colors">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

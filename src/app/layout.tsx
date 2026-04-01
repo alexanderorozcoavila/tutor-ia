@@ -24,6 +24,7 @@ import { AlertProvider } from "@/lib/AlertContext";
 import { AuthProvider } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { SessionProvider } from "@/components/SessionProvider";
+import { SystemMenu } from "@/components/SystemMenu";
 
 export const metadata: Metadata = {
   title: "IA Tutor - Apoyo a la Lectoescritura",
@@ -43,6 +44,7 @@ export default function RootLayout({
             <ThemeProvider>
               <SessionProvider>
                 {children}
+                <SystemMenu />
               </SessionProvider>
             </ThemeProvider>
           </AuthProvider>

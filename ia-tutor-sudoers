@@ -1,0 +1,36 @@
+# /etc/sudoers.d/ia-tutor
+# ──────────────────────────────────────────────────────────────
+# Permite al usuario "sergio" ejecutar comandos del sistema
+# sin contraseña para el agente IA Tutor.
+#
+# INSTRUCCIONES:
+#   sudo cp ia-tutor-sudoers /etc/sudoers.d/ia-tutor
+#   sudo chmod 440 /etc/sudoers.d/ia-tutor
+#   sudo visudo -c  ← validar sintaxis
+#
+# IMPORTANTE: Agrega aquí SOLO los comandos que hayas creado
+# en el panel de administración con requiere_sudo=true.
+# ──────────────────────────────────────────────────────────────
+
+# Apagar equipo
+sergio ALL=(root) NOPASSWD: /sbin/shutdown -h now
+
+# Reiniciar equipo  
+sergio ALL=(root) NOPASSWD: /sbin/reboot
+
+# ── Ejemplos adicionales (descomenta los que necesites) ────────
+
+# Calculadora (sin sudo, comentado como referencia)
+# sergio ALL=(sergio) NOPASSWD: /usr/bin/gnome-calculator
+
+# Bloquear pantalla
+# sergio ALL=(root) NOPASSWD: /usr/bin/loginctl lock-session
+
+# Cerrar sesión
+# sergio ALL=(root) NOPASSWD: /usr/bin/loginctl terminate-session
+
+# Subir volumen
+# sergio ALL=(sergio) NOPASSWD: /usr/bin/pactl set-sink-volume @DEFAULT_SINK@ +10%
+
+# Bajar volumen
+# sergio ALL=(sergio) NOPASSWD: /usr/bin/pactl set-sink-volume @DEFAULT_SINK@ -10%

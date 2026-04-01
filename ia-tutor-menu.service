@@ -1,0 +1,25 @@
+[Unit]
+Description=IA Tutor — Agente de Menú del Sistema
+After=network.target ia-tutor-agente.service
+
+[Service]
+# ─── Usuario que ejecuta el agente ───────────────────────────
+# Debe coincidir con USUARIO_LINUX en .env.local
+User=sergio
+Group=sergio
+
+# ─── Entorno ──────────────────────────────────────────────────
+WorkingDirectory=/home/sergio/tutor-ia
+ExecStart=/usr/bin/python3 /home/sergio/tutor-ia/action_agent.py
+
+# ─── Reinicio automático ──────────────────────────────────────
+Restart=always
+RestartSec=5
+
+# ─── Logs via journald ────────────────────────────────────────
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ia-tutor-menu
+
+[Install]
+WantedBy=multi-user.target
