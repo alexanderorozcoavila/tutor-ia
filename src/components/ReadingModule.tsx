@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Task, taskService } from "@/lib/taskService";
-import { useTTS } from "@/hooks/useTTS";
+import { useTTS, TTSDiagnostic } from "@/hooks/useTTS";
 import { useSession } from "@/components/SessionProvider";
 import { ProgressBar } from "@/components/ProgressBar";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
@@ -16,7 +16,7 @@ interface Props {
 
 export function ReadingModule({ task, onFinish }: Props) {
   const { showAlert } = useAlert();
-  const { speak, isSpeaking } = useTTS();
+  const { speak, isSpeaking, diagnostic } = useTTS();
   const { addXP } = useSession();
   const { isRecording, startRecording, stopRecording, audioBlob } = useAudioRecorder();
 
@@ -115,6 +115,24 @@ export function ReadingModule({ task, onFinish }: Props) {
   return (
     <div className="w-full flex flex-col items-center gap-4 md:gap-8 max-w-4xl mx-auto py-4 md:py-12 px-2 md:px-4 select-none touch-none overflow-hidden h-full">
       <ProgressBar />
+
+      {/* === Banner de diagnóstico TTS === */}
+      {(diagnostic.status !== "ok" && diagnostic.status !== "checking") && (
+        <div className="w-full bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
+          <span className="text-2xl flex-shrink-0">🔇</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-red-800 text-sm">
+              Sin sonido — El sistema de voz no está disponible
+            </p>
+            <p className="text-red-600 text-xs mt-1 font-bold">{diagnostic.message}</p>
+            {(diagnostic.status === "no-voices" || diagnostic.status === "no-spanish") && (
+              <div className="mt-2 text-[10px] text-red-500 font-bold bg-white/50 p-2 rounded-lg">
+                💡 Pide ayuda al tutor para instalar el sistema de voz (espeak).
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       
       <div className="bg-white/90 backdrop-blur-md p-4 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl border-4 border-amber-50 flex flex-col items-center gap-4 md:gap-10 w-full flex-grow md:min-h-[500px]">
         

@@ -8,6 +8,7 @@ import { rewardService, Recompensa } from "@/lib/rewardService";
 import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon, Monitor, UserCheck } from "lucide-react";
 import { systemMenuService, MenuAccionCompleta } from "@/lib/systemMenuService";
 import { Modal } from "./Modal";
+import { AudioDiagnosticsPanel } from "./AudioDiagnosticsPanel";
 import { useAlert } from "@/lib/AlertContext";
 
 export function AdminPanel() {
@@ -18,7 +19,7 @@ export function AdminPanel() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"tutor" | "admin">("tutor");
   const [isCreating, setIsCreating] = useState(false);
-  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "menu" | "settings">("users");
+  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "menu" | "audio" | "settings">("users");
   const [themes, setThemes] = useState<any[]>([]);
   const [isThemesLoading, setIsThemesLoading] = useState(false);
 
@@ -452,6 +453,12 @@ export function AdminPanel() {
           className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "menu" ? "bg-white text-cyan-600 shadow-md" : "text-indigo-400 hover:text-cyan-500"}`}
         >
           🖥️ Menú
+        </button>
+        <button
+          onClick={() => setActiveMainTab("audio")}
+          className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "audio" ? "bg-white text-violet-600 shadow-md" : "text-indigo-400 hover:text-violet-500"}`}
+        >
+          🔊 Audio
         </button>
         <button 
           onClick={() => setActiveMainTab("settings")}
@@ -1168,6 +1175,13 @@ export function AdminPanel() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── TAB: Audio y Voz ────────────────────────────────────── */}
+      {activeMainTab === "audio" && (
+        <div className="animate-in fade-in slide-in-from-bottom-4">
+          <AudioDiagnosticsPanel />
         </div>
       )}
 
