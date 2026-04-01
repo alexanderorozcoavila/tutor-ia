@@ -5,7 +5,7 @@ import { User, userService } from "@/lib/userService";
 import { settingsService } from "@/lib/settingsService";
 import { lmsService, Subject } from "@/lib/lmsService";
 import { rewardService, Recompensa } from "@/lib/rewardService";
-import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon } from "lucide-react";
+import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon, Monitor, UserCheck } from "lucide-react";
 import { Modal } from "./Modal";
 import { useAlert } from "@/lib/AlertContext";
 
@@ -53,6 +53,12 @@ export function AdminPanel() {
   const [rwComando, setRwComando] = useState("");
   const [rwImagenUrl, setRwImagenUrl] = useState("");
   const rwImagenRef = useRef<HTMLInputElement>(null);
+
+  // Configurar Dispositivo (Kiosco)
+  const [deviceAlumnoId, setDeviceAlumnoId] = useState<string>("");
+  const [currentDeviceAlumnoId, setCurrentDeviceAlumnoId] = useState<string | null>(null);
+  const [isSavingDevice, setIsSavingDevice] = useState(false);
+  const [isDeviceLoading, setIsDeviceLoading] = useState(false);
 
   // Modal de Asignación a Tutor
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
@@ -167,12 +173,47 @@ export function AdminPanel() {
     }
   };
 
+  const loadDeviceConfig = async () => {
+    setIsDeviceLoading(true);
+    try {
+      const res = await fetch('/api/configure-device');
+      const data = await res.json();
+      setCurrentDeviceAlumnoId(data.alumnoId || null);
+      setDeviceAlumnoId(data.alumnoId || "");
+    } catch (e) {
+      console.error('Error cargando config dispositivo:', e);
+    } finally {
+      setIsDeviceLoading(false);
+    }
+  };
+
+  const handleSaveDevice = async () => {
+    if (!deviceAlumnoId) return showAlert("Selecciona un alumno.", { type: "info" });
+    setIsSavingDevice(true);
+    try {
+      const res = await fetch('/api/configure-device', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alumnoId: deviceAlumnoId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setCurrentDeviceAlumnoId(deviceAlumnoId);
+      showAlert("✅ Equipo configurado. Reinicia el agente para aplicar.", { type: "success" });
+    } catch (err: any) {
+      showAlert(err.message || "Error al guardar la configuración", { type: "error" });
+    } finally {
+      setIsSavingDevice(false);
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadSettings();
     loadSubjects();
     loadThemes();
     loadRecompensas();
+    loadDeviceConfig();
   }, []);
 
   const handleUpdateSettings = async () => {
@@ -874,6 +915,66 @@ export function AdminPanel() {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* ── Configurar Equipo Kiosco ─────────────────────────────── */}
+          <div className="bg-gradient-to-br from-cyan-900 to-blue-900 p-8 rounded-[2.5rem] shadow-xl text-white mt-8">
+            <h2 className="text-2xl font-black mb-2 flex items-center gap-3">
+              <Monitor className="text-cyan-400" size={24} /> Configurar Equipo Kiosco
+            </h2>
+            <p className="text-cyan-300 text-sm font-bold mb-6">Asigna este equipo a un alumno. El agente kiosco usará este ID para controlar las recompensas.</p>
+            
+            {isDeviceLoading ? (
+              <div className="flex items-center gap-3 p-4 bg-white/10 rounded-xl">
+                <Loader2 className="animate-spin text-cyan-400" size={20} />
+                <span className="font-bold text-sm">Cargando configuración actual...</span>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Estado actual */}
+                {currentDeviceAlumnoId && (
+                  <div className="flex items-center gap-3 p-4 bg-emerald-500/20 border border-emerald-400/30 rounded-xl">
+                    <UserCheck size={20} className="text-emerald-400 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-black text-emerald-300 uppercase tracking-widest">Alumno Asignado Actualmente</p>
+                      <p className="text-sm font-bold text-white truncate">
+                        {users.find(u => u.id === currentDeviceAlumnoId)?.username || currentDeviceAlumnoId}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Selector */}
+                <div className="space-y-2">
+                  <label className="text-xs font-black text-cyan-300 uppercase tracking-widest">Seleccionar Alumno</label>
+                  <select
+                    value={deviceAlumnoId}
+                    onChange={e => setDeviceAlumnoId(e.target.value)}
+                    className="w-full bg-white/10 p-4 rounded-xl border border-white/20 text-white font-bold focus:border-cyan-400 outline-none transition-all appearance-none"
+                  >
+                    <option value="" className="text-gray-900">— Selecciona un alumno —</option>
+                    {users.filter(u => u.role === 'student').map(u => (
+                      <option key={u.id} value={u.id} className="text-gray-900">
+                        {u.username} {u.id === currentDeviceAlumnoId ? '(actual)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleSaveDevice}
+                  disabled={isSavingDevice || !deviceAlumnoId || deviceAlumnoId === currentDeviceAlumnoId}
+                  className="w-full py-4 bg-cyan-500 hover:bg-cyan-400 text-white rounded-xl font-black shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isSavingDevice ? <Loader2 className="animate-spin" size={18} /> : <Monitor size={18} />}
+                  {isSavingDevice ? 'Guardando...' : 'Asignar Equipo a Alumno'}
+                </button>
+
+                <p className="text-[10px] text-cyan-400/60 font-bold text-center">
+                  ⚠️ Después de cambiar el alumno, reinicia el agente: <code className="bg-white/10 px-1.5 py-0.5 rounded">sudo systemctl restart ia-tutor-agente</code>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

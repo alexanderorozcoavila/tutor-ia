@@ -28,13 +28,14 @@ from dotenv import load_dotenv
 
 # ─── CONFIGURACIÓN ────────────────────────────────────────────────────────────
 
-# Ruta al archivo .env.local
-RUTA_ENV = os.getenv("ENV_PATH", "/home/alumno/ia-tutor/.env.local")
+# Ruta al archivo .env.local (por defecto junto al script)
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+RUTA_ENV = os.getenv("ENV_PATH", os.path.join(SCRIPT_DIR, ".env.local"))
 load_dotenv(dotenv_path=RUTA_ENV)
 
 SUPABASE_URL = os.getenv("NEXT_PUBLIC_SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-ALUMNO_ID    = os.getenv("ALUMNO_ID", "EL_ID_DEL_ALUMNO_AQUI")
+ALUMNO_ID    = os.getenv("ALUMNO_ID")
 
 # URL de la plataforma educativa (kiosco principal al que volver)
 KIOSCO_HOME_URL = os.getenv("KIOSCO_HOME_URL", "http://localhost:3000")
@@ -61,8 +62,10 @@ if not SUPABASE_URL or not SUPABASE_KEY:
     log.error("❌ Error: No se encontraron las credenciales en el archivo .env.local")
     sys.exit(1)
 
-if ALUMNO_ID == "EL_ID_DEL_ALUMNO_AQUI":
-    log.warning("⚠️  ALUMNO_ID no configurado. Usa la variable de entorno ALUMNO_ID.")
+if not ALUMNO_ID:
+    log.error("❌ Error: ALUMNO_ID no configurado. Agrégalo en .env.local o como variable de entorno.")
+    log.error(f"   Archivo .env.local buscado en: {RUTA_ENV}")
+    sys.exit(1)
 
 # ─── CLIENTE SUPABASE ─────────────────────────────────────────────────────────
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
