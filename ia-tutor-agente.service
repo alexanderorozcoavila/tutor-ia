@@ -1,0 +1,11 @@
+[Unit]
+Description=Agente de Control IA Tutor
+After=network.target
+
+[Service]
+ExecStart=/opt/ia-tutor-agente/venv/bin/python /opt/ia-tutor-agente/agente.py
+Restart=always
+User=root
+
+[Install]
+WantedBy=multi-user.target
