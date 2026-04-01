@@ -83,50 +83,44 @@ def obtener_accion(accion_id: str) -> Optional[dict]:
 
 def ejecutar_comando(accion: dict) -> tuple[bool, str]:
     """
-    Ejecuta el comando definido en la acción.
-    Si requiere_sudo=True, lo ejecuta con sudo (requiere entrada en sudoers).
-    Si no, lo ejecuta como el USUARIO_LINUX configurado.
-    Retorna (exito, mensaje).
+    Ejecuta el comando inyectando variables de entorno visuales
+    para evitar errores de 'cannot open display'.
     """
     nombre    = accion.get("nombre", "?")
     comando   = accion.get("comando", "")
     con_sudo  = accion.get("requiere_sudo", False)
 
-    if not accion.get("activo", True):
-        log.warning(f"Acción '{nombre}' está desactivada. Ignorando.")
-        return False, "Acción desactivada"
+    if not accion.get("activo", True) or not comando:
+        return False, "Acción inactiva o comando vacío"
 
-    if not comando:
-        log.error(f"Acción '{nombre}' no tiene comando definido.")
-        return False, "Comando vacío"
+    # 1. Definir el entorno visual (CRÍTICO para evitar tus errores de las fotos)
+    # Esto le dice a Linux: "Usa el monitor 0 y los permisos de sergio"
+    entorno_visual = f"DISPLAY=:0 XAUTHORITY=/home/{USUARIO_LINUX}/.Xauthority"
 
-    # Construir el comando final
+    # 2. Construir el comando final
     if con_sudo:
+        # Para comandos de sistema (shutdown, reboot)
         cmd_final = f"sudo {comando}"
     else:
-        # Ejecutar como el usuario del kiosco
-        cmd_final = f"sudo -u {USUARIO_LINUX} {comando}"
+        # Para apps visuales (calculadora, terminal, logout)
+        # Usamos '&' al final para que sea asíncrono y no bloquee el agente
+        cmd_final = f"sudo -u {USUARIO_LINUX} {entorno_visual} {comando} &"
 
     log.info(f"▶ Ejecutando: [{nombre}] → {cmd_final}")
 
     try:
-        result = subprocess.run(
+        # Usamos Popen en lugar de run para que sea asíncrono (no bloqueante)
+        subprocess.Popen(
             cmd_final,
             shell=True,
-            capture_output=True,
-            text=True,
-            timeout=10
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True # Desvincula el proceso del agente
         )
-        if result.returncode == 0:
-            log.info(f"✅ OK: [{nombre}]")
-            return True, f"Ejecutado: {nombre}"
-        else:
-            err = result.stderr.strip() or "error desconocido"
-            log.error(f"❌ Error en [{nombre}]: {err}")
-            return False, err
-    except subprocess.TimeoutExpired:
-        log.warning(f"⏰ Timeout ejecutando [{nombre}]")
-        return True, "Ejecutado (timeout — proceso en background)"
+        
+        log.info(f"✅ Disparado: [{nombre}]")
+        return True, f"Acción {nombre} iniciada correctamente"
+
     except Exception as e:
         log.error(f"❌ Excepción ejecutando [{nombre}]: {e}")
         return False, str(e)
