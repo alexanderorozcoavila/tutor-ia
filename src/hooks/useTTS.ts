@@ -9,10 +9,34 @@ interface TTSOptions {
   cooldownMs?: number;
 }
 
+export type TTSStatus =
+  | "checking"       // Aún evaluando
+  | "ok"             // Todo funciona
+  | "no-api"         // El navegador no soporta Web Speech API
+  | "no-voices"      // API disponible pero sin voces instaladas
+  | "no-spanish"     // Hay voces pero ninguna en español
+  | "error";         // Falló al intentar hablar
+
+export interface TTSDiagnostic {
+  status: TTSStatus;
+  totalVoices: number;
+  spanishVoices: number;
+  selectedVoice: string | null;
+  message: string;    // Mensaje legible para mostrar al usuario/admin
+}
+
 export function useTTS(options: TTSOptions = {}) {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [diagnostic, setDiagnostic] = useState<TTSDiagnostic>({
+    status: "checking",
+    totalVoices: 0,
+    spanishVoices: 0,
+    selectedVoice: null,
+    message: "Verificando sistema de voz...",
+  });
+
   const resumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,22 +49,92 @@ export function useTTS(options: TTSOptions = {}) {
     };
   }, []);
 
-  // Carga de voces — compatible con todos los motores (Chrome, Firefox, Chromium Linux)
+  // Carga de voces + diagnóstico
   useEffect(() => {
-    if (!("speechSynthesis" in window)) return;
+    if (!("speechSynthesis" in window)) {
+      setDiagnostic({
+        status: "no-api",
+        totalVoices: 0,
+        spanishVoices: 0,
+        selectedVoice: null,
+        message: "Este navegador no soporta síntesis de voz. Usa Chromium o Firefox actualizado.",
+      });
+      return;
+    }
+
+    const runDiagnostic = (voiceList: SpeechSynthesisVoice[]) => {
+      const total = voiceList.length;
+      const spanish = voiceList.filter(v =>
+        v.lang.toLowerCase().startsWith("es") ||
+        v.name.toLowerCase().includes("spanish") ||
+        v.name.toLowerCase().includes("español")
+      );
+
+      if (total === 0) {
+        setDiagnostic({
+          status: "no-voices",
+          totalVoices: 0,
+          spanishVoices: 0,
+          selectedVoice: null,
+          message: "No hay voces instaladas en el sistema. En Lubuntu ejecuta: sudo apt install speech-dispatcher espeak-ng",
+        });
+        return;
+      }
+
+      if (spanish.length === 0) {
+        setDiagnostic({
+          status: "no-spanish",
+          totalVoices: total,
+          spanishVoices: 0,
+          selectedVoice: null,
+          message: `Hay ${total} voz(ces) pero ninguna en español. Instala espeak-ng con idioma español: sudo apt install espeak-ng-data`,
+        });
+        return;
+      }
+
+      const best = spanish.find(v => v.name.includes("Google") || v.name.includes("Premium")) ?? spanish[0];
+      setDiagnostic({
+        status: "ok",
+        totalVoices: total,
+        spanishVoices: spanish.length,
+        selectedVoice: best.name,
+        message: `Voz activa: "${best.name}" (${best.lang})`,
+      });
+    };
 
     const load = () => {
       const v = window.speechSynthesis.getVoices();
-      if (v.length > 0) setVoices(v);
+      if (v.length > 0) {
+        setVoices(v);
+        runDiagnostic(v);
+      }
     };
 
     load();
     window.speechSynthesis.onvoiceschanged = load;
 
-    // En algunos navegadores Linux las voces tardan más en cargar
-    const retryTimer = setTimeout(load, 1000);
+    // Retry en Linux (voces tardan en cargarse)
+    const t1 = setTimeout(load, 800);
+    const t2 = setTimeout(load, 2000);
+
+    // Timeout final: si tras 3s no hay voces, reportar el error
+    const t3 = setTimeout(() => {
+      const v = window.speechSynthesis.getVoices();
+      if (v.length === 0) {
+        setDiagnostic({
+          status: "no-voices",
+          totalVoices: 0,
+          spanishVoices: 0,
+          selectedVoice: null,
+          message: "No hay voces instaladas en el sistema. En Lubuntu: sudo apt install speech-dispatcher espeak-ng espeak-ng-data",
+        });
+      }
+    }, 3000);
+
     return () => {
-      clearTimeout(retryTimer);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
       window.speechSynthesis.onvoiceschanged = null;
     };
   }, []);
@@ -50,32 +144,18 @@ export function useTTS(options: TTSOptions = {}) {
     window.speechSynthesis.cancel();
   }, []);
 
-  /**
-   * Selecciona la mejor voz española disponible en el sistema.
-   * Lubuntu/Linux usa voces con nombres como "Spanish", "es_ES", "espeak" etc.
-   * — diferente a Chrome/Mac que usa "Google español", "Paulina", etc.
-   * Estrategia: primero busca por lang, luego por nombre, luego fallback a cualquier española.
-   */
   const selectVoice = useCallback((voiceList: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
     if (voiceList.length === 0) return null;
-
     const targetLang = options.lang ?? "es-ES";
-
-    // 1. Voces que coinciden exactamente con el idioma objetivo
     const exactMatch = voiceList.filter(v => v.lang === targetLang);
-
-    // 2. Voces que empiezan con "es" (es-ES, es-MX, es_ES, es_CL…)
     const spanishVoices = voiceList.filter(v =>
       v.lang.toLowerCase().startsWith("es") ||
       v.name.toLowerCase().includes("spanish") ||
       v.name.toLowerCase().includes("español") ||
-      v.name.toLowerCase().includes("espeak") // Linux espeak-ng
+      v.name.toLowerCase().includes("espeak")
     );
-
     const pool = exactMatch.length > 0 ? exactMatch : spanishVoices;
     if (pool.length === 0) return null;
-
-    // Preferir voces de red/premium si están disponibles
     const premium = pool.find(v =>
       v.name.includes("Premium") || v.name.includes("Network") ||
       v.name.includes("Natural") || v.name.includes("Google") ||
@@ -86,12 +166,8 @@ export function useTTS(options: TTSOptions = {}) {
 
   const speak = useCallback(
     (text: string) => {
-      if (!("speechSynthesis" in window)) {
-        console.warn("La síntesis de voz no está soportada en este navegador.");
-        return;
-      }
+      if (!("speechSynthesis" in window)) return;
 
-      // Limpiar timers previos
       if (resumeIntervalRef.current) {
         clearInterval(resumeIntervalRef.current);
         resumeIntervalRef.current = null;
@@ -109,13 +185,10 @@ export function useTTS(options: TTSOptions = {}) {
       }
 
       const utterance = new SpeechSynthesisUtterance(text);
-
-      // Obtener voces frescas (importante en Linux donde pueden cargarse tarde)
       const currentVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
       const selectedVoice = selectVoice(currentVoices);
       if (selectedVoice) utterance.voice = selectedVoice;
 
-      // Siempre fijar lang aunque no haya voz (el motor usa lang como hint)
       utterance.lang = options.lang ?? "es-ES";
       utterance.pitch = options.pitch ?? 1.0;
       utterance.rate = options.rate ?? 0.85;
@@ -130,6 +203,12 @@ export function useTTS(options: TTSOptions = {}) {
       utterance.onstart = () => {
         setIsSpeaking(true);
         setIsLocked(true);
+        // Confirmar que el TTS está funcionando
+        setDiagnostic(prev => prev.status !== "ok" ? {
+          ...prev,
+          status: "ok",
+          message: `Voz activa: "${selectedVoice?.name ?? "sistema"}"`,
+        } : prev);
       };
 
       utterance.onend = () => {
@@ -145,12 +224,14 @@ export function useTTS(options: TTSOptions = {}) {
         setIsLocked(false);
         if (e.error !== "interrupted" && e.error !== "canceled") {
           console.error("Error en TTS:", e.error);
+          setDiagnostic(prev => ({
+            ...prev,
+            status: "error",
+            message: `Error al reproducir voz: "${e.error}". Verifica que speech-dispatcher esté activo.`,
+          }));
         }
       };
 
-      // Keep-alive SOLO para Chrome/Chromium desktop (evita pausas en frases largas).
-      // En Lubuntu el pause/resume puede causar problemas en espeak-ng,
-      // por eso solo lo activamos si el motor no es espeak.
       const isEspeak = selectedVoice?.name.toLowerCase().includes("espeak") ?? false;
       if (!isEspeak) {
         resumeIntervalRef.current = setInterval(() => {
@@ -163,8 +244,6 @@ export function useTTS(options: TTSOptions = {}) {
         }, 10000);
       }
 
-      // Pequeño delay antes de hablar — necesario en algunos motores Linux
-      // para que speechSynthesis.cancel() haya terminado de limpiar la cola.
       setTimeout(() => {
         window.speechSynthesis.speak(utterance);
       }, 50);
@@ -188,5 +267,5 @@ export function useTTS(options: TTSOptions = {}) {
     }
   }, []);
 
-  return { speak, stop, isSpeaking, isLocked, unlock };
+  return { speak, stop, isSpeaking, isLocked, unlock, diagnostic };
 }

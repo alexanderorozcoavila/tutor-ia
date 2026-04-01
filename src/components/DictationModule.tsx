@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useTTS } from "@/hooks/useTTS";
+import { useTTS, TTSDiagnostic } from "@/hooks/useTTS";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { taskService } from "@/lib/taskService";
 import { settingsService } from "@/lib/settingsService";
@@ -68,7 +68,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
     hideText: false,
   });
 
-  const { speak, isSpeaking, isLocked, stop: stopTTS, unlock } = useTTS({ cooldownMs: 2000 });
+  const { speak, isSpeaking, isLocked, stop: stopTTS, unlock, diagnostic } = useTTS({ cooldownMs: 2000 });
   const { isRecording, startRecording, stopRecording, audioBlob } = useAudioRecorder();
   const alertTimerRef = useRef<number>(0);
 
@@ -588,6 +588,55 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   if (step === "DICTATING") {
     return (
       <div className="w-full max-w-5xl mx-auto p-4 flex flex-col gap-6 relative animate-in fade-in duration-500">
+
+        {/* === Banner de diagnóstico TTS === */}
+        {(diagnostic.status !== "ok" && diagnostic.status !== "checking") && (
+          <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 flex items-start gap-3">
+            <span className="text-2xl flex-shrink-0">🔇</span>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-red-800 text-sm">
+                Sin sonido — El sistema de voz no está disponible
+              </p>
+              <p className="text-red-600 text-xs mt-1 font-bold">{diagnostic.message}</p>
+              {(diagnostic.status === "no-voices" || diagnostic.status === "no-spanish") && (
+                <details className="mt-2">
+                  <summary className="text-xs text-red-500 font-black cursor-pointer hover:text-red-700">Ver instrucciones de instalación ▾</summary>
+                  <div className="mt-2 bg-red-900 text-green-300 rounded-xl p-3 font-mono text-xs leading-relaxed">
+                    <p className="text-gray-400 mb-1"># Ejecutar en el terminal de Lubuntu:</p>
+                    <p>sudo apt install speech-dispatcher \</p>
+                    <p>&nbsp;&nbsp;espeak-ng espeak-ng-data \</p>
+                    <p>&nbsp;&nbsp;libspeechd2</p>
+                    <p className="mt-2 text-gray-400"># Luego reiniciar el navegador</p>
+                  </div>
+                </details>
+              )}
+              {diagnostic.status === "error" && (
+                <details className="mt-2">
+                  <summary className="text-xs text-red-500 font-black cursor-pointer hover:text-red-700">Ver instrucciones de diagnóstico ▾</summary>
+                  <div className="mt-2 bg-red-900 text-green-300 rounded-xl p-3 font-mono text-xs leading-relaxed">
+                    <p className="text-gray-400 mb-1"># Verificar que speech-dispatcher esté activo:</p>
+                    <p>speech-dispatcher</p>
+                    <p className="mt-1">spd-say -l es "prueba de voz"</p>
+                  </div>
+                </details>
+              )}
+            </div>
+            <span
+              title={`Voces totales: ${diagnostic.totalVoices} | En español: ${diagnostic.spanishVoices}`}
+              className="text-[10px] text-red-400 font-black bg-red-100 px-2 py-1 rounded-full flex-shrink-0 cursor-help"
+            >
+              {diagnostic.totalVoices} voz(ces)
+            </span>
+          </div>
+        )}
+
+        {/* Indicador OK sutil (solo cuando status es ok) */}
+        {diagnostic.status === "ok" && (
+          <div className="flex items-center gap-2 text-xs text-emerald-600 font-bold px-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            Voz activa: {diagnostic.selectedVoice ?? "sistema"}
+          </div>
+        )}
 
         {/* === Barra Superior Anclada: Controles Multimedia Directos === */}
         <div className="sticky top-20 z-[100] bg-white/90 backdrop-blur-xl p-4 md:px-8 rounded-[2rem] shadow-xl shadow-indigo-100/50 border-2 border-indigo-50 flex items-center justify-between mb-4">
