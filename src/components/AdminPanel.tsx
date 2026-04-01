@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { User, userService } from "@/lib/userService";
 import { settingsService } from "@/lib/settingsService";
 import { lmsService, Subject } from "@/lib/lmsService";
-import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil } from "lucide-react";
+import { rewardService, Recompensa } from "@/lib/rewardService";
+import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon } from "lucide-react";
 import { Modal } from "./Modal";
 import { useAlert } from "@/lib/AlertContext";
 
@@ -16,7 +17,7 @@ export function AdminPanel() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"tutor" | "admin">("tutor");
   const [isCreating, setIsCreating] = useState(false);
-  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "settings">("users");
+  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "settings">("users");
   const [themes, setThemes] = useState<any[]>([]);
   const [isThemesLoading, setIsThemesLoading] = useState(false);
 
@@ -39,6 +40,20 @@ export function AdminPanel() {
   const [newSubjectName, setNewSubjectName] = useState("");
   const [isSubjectActionLoading, setIsSubjectActionLoading] = useState(false);
   
+  // Estados Recompensas
+  const [recompensas, setRecompensas] = useState<Recompensa[]>([]);
+  const [isRecompensasLoading, setIsRecompensasLoading] = useState(false);
+  const [editingRecompensa, setEditingRecompensa] = useState<Recompensa | null>(null);
+  const [isRecompensaCreating, setIsRecompensaCreating] = useState(false);
+  const [rwNombre, setRwNombre] = useState("");
+  const [rwDescripcion, setRwDescripcion] = useState("");
+  const [rwEmoji, setRwEmoji] = useState("🎁");
+  const [rwTipo, setRwTipo] = useState<"url" | "comando">("url");
+  const [rwUrl, setRwUrl] = useState("");
+  const [rwComando, setRwComando] = useState("");
+  const [rwImagenUrl, setRwImagenUrl] = useState("");
+  const rwImagenRef = useRef<HTMLInputElement>(null);
+
   // Modal de Asignación a Tutor
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedTutorSubjects, setSelectedTutorSubjects] = useState<string[]>([]);
@@ -85,11 +100,79 @@ export function AdminPanel() {
     }
   };
 
+  const loadRecompensas = async () => {
+    setIsRecompensasLoading(true);
+    try {
+      const all = await rewardService.getAllRecompensas();
+      setRecompensas(all);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsRecompensasLoading(false);
+    }
+  };
+
+  const resetRecompensaForm = () => {
+    setEditingRecompensa(null);
+    setRwNombre("");
+    setRwDescripcion("");
+    setRwEmoji("🎁");
+    setRwTipo("url");
+    setRwUrl("");
+    setRwComando("");
+    setRwImagenUrl("");
+  };
+
+  const handleRecompensaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rwNombre.trim()) return showAlert("El nombre de la recompensa es obligatorio.", { type: "info" });
+    if (rwTipo === 'url' && !rwUrl.trim()) return showAlert("Debes ingresar una URL para este tipo de recompensa.", { type: "info" });
+    if (rwTipo === 'comando' && !rwComando.trim()) return showAlert("Debes ingresar un comando.", { type: "info" });
+
+    setIsRecompensaCreating(true);
+    try {
+      const payload = {
+        nombre: rwNombre.trim(),
+        descripcion: rwDescripcion.trim(),
+        icono_emoji: rwEmoji || "🎁",
+        tipo: rwTipo,
+        url: rwTipo === 'url' ? rwUrl.trim() : undefined,
+        comando: rwTipo === 'comando' ? rwComando.trim() : undefined,
+        imagen_url: rwImagenUrl.trim() || undefined,
+      };
+      if (editingRecompensa) {
+        await rewardService.updateRecompensa(editingRecompensa.id, payload);
+        showAlert("Recompensa actualizada", { type: "success" });
+      } else {
+        await rewardService.createRecompensa(payload as any);
+        showAlert("Recompensa creada con éxito", { type: "success" });
+      }
+      resetRecompensaForm();
+      loadRecompensas();
+    } catch (err: any) {
+      showAlert(err.message || "Error al guardar la recompensa", { type: "error" });
+    } finally {
+      setIsRecompensaCreating(false);
+    }
+  };
+
+  const handleDeleteRecompensa = async (id: string) => {
+    if (!confirm("¿Eliminar esta recompensa? Los planes que la tengan asignada perderán la referencia.")) return;
+    try {
+      await rewardService.deleteRecompensa(id);
+      showAlert("Recompensa eliminada", { type: "info" });
+      loadRecompensas();
+    } catch (err: any) {
+      showAlert(err.message, { type: "error" });
+    }
+  };
+
   useEffect(() => {
     loadUsers();
     loadSettings();
     loadSubjects();
     loadThemes();
+    loadRecompensas();
   }, []);
 
   const handleUpdateSettings = async () => {
@@ -240,24 +323,30 @@ export function AdminPanel() {
       </div>
 
       {/* Tabs de Navegación del Admin */}
-      <div className="flex bg-indigo-50/50 p-2 rounded-3xl border-2 border-indigo-100/50">
+      <div className="flex flex-wrap gap-2 bg-indigo-50/50 p-2 rounded-3xl border-2 border-indigo-100/50">
         <button 
           onClick={() => setActiveMainTab("users")}
-          className={`flex-1 py-4 rounded-2xl font-black transition-all ${activeMainTab === "users" ? "bg-white text-indigo-600 shadow-md" : "text-indigo-400 hover:text-indigo-600"}`}
+          className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "users" ? "bg-white text-indigo-600 shadow-md" : "text-indigo-400 hover:text-indigo-600"}`}
         >
-          Gestión de Usuarios
+          Usuarios
+        </button>
+        <button 
+          onClick={() => setActiveMainTab("rewards")}
+          className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "rewards" ? "bg-white text-amber-600 shadow-md" : "text-indigo-400 hover:text-amber-500"}`}
+        >
+          🎁 Recompensas
         </button>
         <button 
           onClick={() => setActiveMainTab("themes")}
-          className={`flex-1 py-4 rounded-2xl font-black transition-all ${activeMainTab === "themes" ? "bg-white text-indigo-600 shadow-md" : "text-indigo-400 hover:text-indigo-600"}`}
+          className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "themes" ? "bg-white text-indigo-600 shadow-md" : "text-indigo-400 hover:text-indigo-600"}`}
         >
-          Sistema de Temas
+          Temas
         </button>
         <button 
           onClick={() => setActiveMainTab("settings")}
-          className={`flex-1 py-4 rounded-2xl font-black transition-all ${activeMainTab === "settings" ? "bg-white text-indigo-600 shadow-md" : "text-indigo-400 hover:text-indigo-600"}`}
+          className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "settings" ? "bg-white text-indigo-600 shadow-md" : "text-indigo-400 hover:text-indigo-600"}`}
         >
-          Configuración Global
+          Configuración
         </button>
       </div>
 
@@ -366,6 +455,206 @@ export function AdminPanel() {
           </div>
         </div>
 
+        </div>
+      )}
+
+      {/* ──────── PESTAÑA RECOMPENSAS ──────── */}
+      {activeMainTab === "rewards" && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+          {/* Formulario Crear/Editar */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border-2 border-amber-100">
+            <h2 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-3">
+              <div className="p-2 bg-amber-100 rounded-xl text-amber-600"><Gift size={24} /></div>
+              {editingRecompensa ? "Editar Recompensa" : "Crear Nueva Recompensa"}
+            </h2>
+            <form onSubmit={handleRecompensaSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Columna Izquierda */}
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 block">Nombre *</label>
+                  <input
+                    type="text"
+                    value={rwNombre}
+                    onChange={e => setRwNombre(e.target.value)}
+                    placeholder="Ej: YouTube Kids, Minecraft, Película"
+                    className="w-full p-4 rounded-xl bg-amber-50 border-2 border-amber-100 focus:border-amber-400 outline-none font-bold text-gray-800"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 block">Descripción</label>
+                  <textarea
+                    value={rwDescripcion}
+                    onChange={e => setRwDescripcion(e.target.value)}
+                    placeholder="Descripción breve de la recompensa..."
+                    rows={3}
+                    className="w-full p-4 rounded-xl bg-gray-50 border-2 border-transparent focus:border-amber-200 outline-none font-bold text-gray-700 resize-none"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 block">Emoji / Ícono</label>
+                    <input
+                      type="text"
+                      value={rwEmoji}
+                      onChange={e => setRwEmoji(e.target.value)}
+                      maxLength={4}
+                      className="w-full p-4 rounded-xl bg-amber-50 border-2 border-amber-100 focus:border-amber-400 outline-none font-bold text-3xl text-center"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 block">Tipo *</label>
+                    <select
+                      value={rwTipo}
+                      onChange={e => setRwTipo(e.target.value as any)}
+                      className="w-full p-4 rounded-xl bg-gray-50 border-2 border-transparent focus:border-amber-200 outline-none font-bold text-gray-700 h-[58px]"
+                    >
+                      <option value="url">🌐 URL / Web</option>
+                      <option value="comando">⚙️ Comando</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Columna Derecha */}
+              <div className="space-y-4">
+                {rwTipo === 'url' ? (
+                  <div>
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Link size={12} /> URL de la App / Sitio *</label>
+                    <input
+                      type="url"
+                      value={rwUrl}
+                      onChange={e => setRwUrl(e.target.value)}
+                      placeholder="https://youtubekids.com"
+                      className="w-full p-4 rounded-xl bg-blue-50 border-2 border-blue-100 focus:border-blue-400 outline-none font-bold text-gray-800 font-mono text-sm"
+                    />
+                    <p className="text-[10px] text-gray-400 font-bold mt-1">Se abrirá en Chromium en modo kiosco.</p>
+                  </div>
+                ) : (
+                  <div>
+                    <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><Terminal size={12} /> Comando del Sistema *</label>
+                    <input
+                      type="text"
+                      value={rwComando}
+                      onChange={e => setRwComando(e.target.value)}
+                      placeholder="minecraft-launcher --fullscreen"
+                      className="w-full p-4 rounded-xl bg-gray-900 text-green-400 border-2 border-gray-700 focus:border-green-500 outline-none font-mono text-sm"
+                    />
+                    <p className="text-[10px] text-red-400 font-bold mt-1">⚠️ Solo para admins. Se ejecuta en el dispositivo kiosco.</p>
+                  </div>
+                )}
+
+                <div>
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1"><ImageIcon size={12} /> URL de Imagen / Logo (opcional)</label>
+                  <input
+                    type="url"
+                    value={rwImagenUrl}
+                    onChange={e => setRwImagenUrl(e.target.value)}
+                    placeholder="https://ejemplo.com/logo.png"
+                    className="w-full p-4 rounded-xl bg-gray-50 border-2 border-transparent focus:border-amber-200 outline-none font-bold text-gray-700 text-sm"
+                  />
+                </div>
+
+                {/* Preview */}
+                {(rwNombre || rwEmoji) && (
+                  <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border-2 border-amber-100 flex items-center gap-4">
+                    {rwImagenUrl ? (
+                      <img src={rwImagenUrl} alt="preview" className="w-16 h-16 rounded-2xl object-cover shadow-md" onError={e => (e.currentTarget.style.display = 'none')} />
+                    ) : (
+                      <div className="w-16 h-16 bg-amber-200 rounded-2xl flex items-center justify-center text-3xl shadow-inner">{rwEmoji || "🎁"}</div>
+                    )}
+                    <div>
+                      <p className="font-black text-gray-800 text-lg">{rwNombre || "Nombre..."}</p>
+                      <p className="text-xs font-bold text-amber-600 uppercase">{rwTipo === 'url' ? `🌐 ${rwUrl || 'sin URL'}` : `⚙️ Comando`}</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    type="submit"
+                    disabled={isRecompensaCreating}
+                    className="flex-1 p-4 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  >
+                    {isRecompensaCreating ? <Loader2 className="animate-spin" /> : <>{editingRecompensa ? <Pencil size={18} /> : <Plus size={18} />} {editingRecompensa ? "Actualizar" : "Crear Recompensa"}</>}
+                  </button>
+                  {editingRecompensa && (
+                    <button type="button" onClick={resetRecompensaForm} className="p-4 bg-gray-100 text-gray-500 rounded-xl font-black hover:bg-gray-200 transition-all">
+                      <X size={20} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </form>
+          </div>
+
+          {/* Lista de Recompensas */}
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border-2 border-gray-50">
+            <h2 className="text-2xl font-black text-gray-900 mb-6 flex items-center gap-3">
+              <Gift className="text-amber-500" size={24} /> Catálogo de Recompensas ({recompensas.length})
+            </h2>
+            {isRecompensasLoading ? (
+              <div className="flex justify-center p-8"><Loader2 className="animate-spin text-amber-400" size={32} /></div>
+            ) : recompensas.length === 0 ? (
+              <div className="text-center p-12 bg-amber-50 rounded-[2rem] border-2 border-dashed border-amber-100">
+                <div className="text-5xl mb-3">🎁</div>
+                <p className="font-black text-amber-600">No hay recompensas creadas aún.</p>
+                <p className="text-sm font-bold text-amber-400 mt-1">Usa el formulario de arriba para crear la primera.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recompensas.map(r => (
+                  <div key={r.id} className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-[2rem] border-2 border-amber-100 p-5 flex flex-col gap-4 hover:shadow-md hover:border-amber-300 transition-all group">
+                    <div className="flex items-center gap-4">
+                      {r.imagen_url ? (
+                        <img src={r.imagen_url} alt={r.nombre} className="w-16 h-16 rounded-2xl object-cover shadow-md flex-shrink-0" onError={e => (e.currentTarget.style.display = 'none')} />
+                      ) : (
+                        <div className="w-16 h-16 bg-amber-200 rounded-2xl flex items-center justify-center text-3xl shadow-inner flex-shrink-0">{r.icono_emoji || "🎁"}</div>
+                      )}
+                      <div className="min-w-0">
+                        <h4 className="font-black text-gray-800 text-lg leading-tight truncate">{r.nombre}</h4>
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full mt-1 inline-block ${
+                          r.tipo === 'url' ? 'bg-blue-100 text-blue-600' : 'bg-gray-800 text-green-400'
+                        }`}>
+                          {r.tipo === 'url' ? '🌐 URL' : '⚙️ Comando'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {r.descripcion && <p className="text-xs font-bold text-gray-500 line-clamp-2">{r.descripcion}</p>}
+
+                    <div className="bg-white/70 rounded-xl p-3 font-mono text-xs text-gray-600 truncate border border-amber-100">
+                      {r.tipo === 'url' ? r.url : r.comando}
+                    </div>
+
+                    <div className="flex gap-2 mt-auto">
+                      <button
+                        onClick={() => {
+                          setEditingRecompensa(r);
+                          setRwNombre(r.nombre);
+                          setRwDescripcion(r.descripcion || "");
+                          setRwEmoji(r.icono_emoji || "🎁");
+                          setRwTipo(r.tipo);
+                          setRwUrl(r.url || "");
+                          setRwComando(r.comando || "");
+                          setRwImagenUrl(r.imagen_url || "");
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="flex-1 py-2.5 bg-white text-amber-600 rounded-xl font-black text-xs border-2 border-amber-100 hover:bg-amber-50 transition-all flex items-center justify-center gap-1"
+                      >
+                        <Pencil size={12} /> Editar
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRecompensa(r.id)}
+                        className="p-2.5 text-gray-300 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

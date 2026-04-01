@@ -394,12 +394,11 @@ export const planService = {
       return achieved;
     }
 
-    // Usaremos un fetch local manual para asegurar soporte multiplataforma en Supabase.
-    // Lo ideal seria RPC pero fetch + local match es rápido
+    // Corrección: usar estado='completada' en lugar de columna booleana inexistente
     const { data: tareas } = await supabase.from('tarea_planificada')
-       .select('puntos_valor, completada')
+       .select('puntos_valor')
        .eq('plan_semanal_id', planId)
-       .eq('completada', true);
+       .eq('estado', 'completada');
        
     const { data: plan } = await supabase.from('plan_semanal')
        .select('meta_puntos_total, esta_lograda')
@@ -408,7 +407,7 @@ export const planService = {
 
     if (!plan || !tareas) return false;
 
-    const points = tareas.reduce((a, b) => a + b.puntos_valor, 0);
+    const points = (tareas as any[]).reduce((a: number, b: any) => a + (b.puntos_valor || 0), 0);
     const isUnlocked = points >= plan.meta_puntos_total;
     
     if (plan.esta_lograda !== isUnlocked) {

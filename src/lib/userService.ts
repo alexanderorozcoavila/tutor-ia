@@ -202,6 +202,34 @@ export const userService = {
     return data[0];
   },
 
+  async updateTheme(id: string, updates: { name: string, slug: string, config: any }) {
+    if (!isSupabaseConfigured) {
+      const saved = localStorage.getItem('ia_tutor_themes');
+      const themes = saved ? JSON.parse(saved) : [];
+      const idx = themes.findIndex((t: any) => t.id === id);
+      if (idx !== -1) {
+        themes[idx] = { ...themes[idx], ...updates };
+        localStorage.setItem('ia_tutor_themes', JSON.stringify(themes));
+        return themes[idx];
+      }
+      throw new Error("Tema no encontrado");
+    }
+    const { data, error } = await supabase.from('themes').update(updates).eq('id', id).select().single();
+    if (error) throw error;
+    return data;
+  },
+
+  async deleteTheme(id: string) {
+    if (!isSupabaseConfigured) {
+      const saved = localStorage.getItem('ia_tutor_themes');
+      const themes = saved ? JSON.parse(saved) : [];
+      localStorage.setItem('ia_tutor_themes', JSON.stringify(themes.filter((t: any) => t.id !== id)));
+      return;
+    }
+    const { error } = await supabase.from('themes').delete().eq('id', id);
+    if (error) throw error;
+  },
+
   async updateUserTheme(userId: string, themeId: string) {
     if (!isSupabaseConfigured) {
       const users = getLocalUsers();
