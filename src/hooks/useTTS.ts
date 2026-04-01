@@ -6,7 +6,7 @@ interface TTSOptions {
   pitch?: number;
   rate?: number;
   lang?: string;
-  cooldownMs?: number; // Agregado para soportar candado antirrebote
+  cooldownMs?: number;
 }
 
 export function useTTS(options: TTSOptions = {}) {
@@ -15,37 +15,74 @@ export function useTTS(options: TTSOptions = {}) {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const resumeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const cooldownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Guardamos el utterance pendiente para poder cancelarlo limpiamente
-  const pendingUtterRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   // Limpiar al desmontar
   useEffect(() => {
     return () => {
       if (resumeIntervalRef.current) clearInterval(resumeIntervalRef.current);
+      if (cooldownTimerRef.current) clearTimeout(cooldownTimerRef.current);
       window.speechSynthesis?.cancel();
     };
   }, []);
 
-  // Cargar voces — el evento onvoiceschanged es necesario en Chrome
+  // Carga de voces — compatible con todos los motores (Chrome, Firefox, Chromium Linux)
   useEffect(() => {
-    const load = () => setVoices(window.speechSynthesis.getVoices());
+    if (!("speechSynthesis" in window)) return;
+
+    const load = () => {
+      const v = window.speechSynthesis.getVoices();
+      if (v.length > 0) setVoices(v);
+    };
+
     load();
     window.speechSynthesis.onvoiceschanged = load;
-    return () => { window.speechSynthesis.onvoiceschanged = null; };
+
+    // En algunos navegadores Linux las voces tardan más en cargar
+    const retryTimer = setTimeout(load, 1000);
+    return () => {
+      clearTimeout(retryTimer);
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  const unlock = useCallback(() => {
+    if (!("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
   }, []);
 
   /**
-   * unlock() — debe llamarse desde un handler de click del usuario.
-   * Ejecuta un cancel() para "despertar" el motor de síntesis sin encolar
-   * ningún utterance que pueda interferir con la primera frase real.
-   * No usa speak() silencioso porque eso crea una race condition.
+   * Selecciona la mejor voz española disponible en el sistema.
+   * Lubuntu/Linux usa voces con nombres como "Spanish", "es_ES", "espeak" etc.
+   * — diferente a Chrome/Mac que usa "Google español", "Paulina", etc.
+   * Estrategia: primero busca por lang, luego por nombre, luego fallback a cualquier española.
    */
-  const unlock = useCallback(() => {
-    if (!("speechSynthesis" in window)) return;
-    // Un cancel() desde un gesto de usuario desbloquea el motor en Chrome/Safari
-    // sin necesidad de encolar nada extra.
-    window.speechSynthesis.cancel();
-  }, []);
+  const selectVoice = useCallback((voiceList: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null => {
+    if (voiceList.length === 0) return null;
+
+    const targetLang = options.lang ?? "es-ES";
+
+    // 1. Voces que coinciden exactamente con el idioma objetivo
+    const exactMatch = voiceList.filter(v => v.lang === targetLang);
+
+    // 2. Voces que empiezan con "es" (es-ES, es-MX, es_ES, es_CL…)
+    const spanishVoices = voiceList.filter(v =>
+      v.lang.toLowerCase().startsWith("es") ||
+      v.name.toLowerCase().includes("spanish") ||
+      v.name.toLowerCase().includes("español") ||
+      v.name.toLowerCase().includes("espeak") // Linux espeak-ng
+    );
+
+    const pool = exactMatch.length > 0 ? exactMatch : spanishVoices;
+    if (pool.length === 0) return null;
+
+    // Preferir voces de red/premium si están disponibles
+    const premium = pool.find(v =>
+      v.name.includes("Premium") || v.name.includes("Network") ||
+      v.name.includes("Natural") || v.name.includes("Google") ||
+      v.name.includes("Microsoft")
+    );
+    return premium ?? pool[0];
+  }, [options.lang]);
 
   const speak = useCallback(
     (text: string) => {
@@ -54,7 +91,7 @@ export function useTTS(options: TTSOptions = {}) {
         return;
       }
 
-      // Detener keep-alive y cooldown previo
+      // Limpiar timers previos
       if (resumeIntervalRef.current) {
         clearInterval(resumeIntervalRef.current);
         resumeIntervalRef.current = null;
@@ -64,40 +101,24 @@ export function useTTS(options: TTSOptions = {}) {
         cooldownTimerRef.current = null;
       }
 
-      // Cancelar cualquier audio en curso
       window.speechSynthesis.cancel();
 
-      // Si no hay texto real, salir (evita encolar utterances vacíos)
       if (!text || !text.trim()) {
         setIsLocked(false);
         return;
       }
 
       const utterance = new SpeechSynthesisUtterance(text);
-      pendingUtterRef.current = utterance;
 
-      let currentVoices = voices;
-      if (currentVoices.length === 0) currentVoices = window.speechSynthesis.getVoices();
-
-      const spanishVoices = currentVoices.filter(v => v.lang.startsWith("es"));
-
-      const premiumVoice = spanishVoices.find(v =>
-        v.name.includes("Premium") || v.name.includes("Network") ||
-        v.name.includes("Natural") || v.name.includes("Google español (Estados Unidos)") ||
-        v.name.includes("Paulina")
-      );
-
-      const defaultVoice = spanishVoices.find(v =>
-        v.name.includes("Google") || v.name.includes("Microsoft") ||
-        v.name.includes("Mónica") || v.name.includes("Helena")
-      ) || spanishVoices[0];
-
-      const selectedVoice = premiumVoice || defaultVoice;
+      // Obtener voces frescas (importante en Linux donde pueden cargarse tarde)
+      const currentVoices = voices.length > 0 ? voices : window.speechSynthesis.getVoices();
+      const selectedVoice = selectVoice(currentVoices);
       if (selectedVoice) utterance.voice = selectedVoice;
 
-      utterance.pitch = options.pitch ?? (premiumVoice ? 1.0 : 1.1);
-      utterance.rate = options.rate ?? 0.85;
+      // Siempre fijar lang aunque no haya voz (el motor usa lang como hint)
       utterance.lang = options.lang ?? "es-ES";
+      utterance.pitch = options.pitch ?? 1.0;
+      utterance.rate = options.rate ?? 0.85;
 
       const clearKeepAlive = () => {
         if (resumeIntervalRef.current) {
@@ -110,39 +131,45 @@ export function useTTS(options: TTSOptions = {}) {
         setIsSpeaking(true);
         setIsLocked(true);
       };
-      
-      utterance.onend = () => { 
-        clearKeepAlive(); 
-        setIsSpeaking(false); 
-        // Iniciar Candado Anti-Rebote (Cooldown)
+
+      utterance.onend = () => {
+        clearKeepAlive();
+        setIsSpeaking(false);
         const cooldown = options.cooldownMs ?? 2000;
-        cooldownTimerRef.current = setTimeout(() => {
-          setIsLocked(false);
-        }, cooldown);
+        cooldownTimerRef.current = setTimeout(() => setIsLocked(false), cooldown);
       };
-      
+
       utterance.onerror = (e) => {
         clearKeepAlive();
+        setIsSpeaking(false);
+        setIsLocked(false);
         if (e.error !== "interrupted" && e.error !== "canceled") {
           console.error("Error en TTS:", e.error);
         }
-        setIsSpeaking(false);
-        setIsLocked(false);
       };
 
-      // Keep-alive para Chrome (evita pausas automáticas en frases largas)
-      resumeIntervalRef.current = setInterval(() => {
-        if (window.speechSynthesis.speaking) {
-          window.speechSynthesis.pause();
-          window.speechSynthesis.resume();
-        } else {
-          clearKeepAlive();
-        }
-      }, 10000);
+      // Keep-alive SOLO para Chrome/Chromium desktop (evita pausas en frases largas).
+      // En Lubuntu el pause/resume puede causar problemas en espeak-ng,
+      // por eso solo lo activamos si el motor no es espeak.
+      const isEspeak = selectedVoice?.name.toLowerCase().includes("espeak") ?? false;
+      if (!isEspeak) {
+        resumeIntervalRef.current = setInterval(() => {
+          if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          } else {
+            clearKeepAlive();
+          }
+        }, 10000);
+      }
 
-      window.speechSynthesis.speak(utterance);
+      // Pequeño delay antes de hablar — necesario en algunos motores Linux
+      // para que speechSynthesis.cancel() haya terminado de limpiar la cola.
+      setTimeout(() => {
+        window.speechSynthesis.speak(utterance);
+      }, 50);
     },
-    [voices, options.pitch, options.rate, options.lang]
+    [voices, selectVoice, options.pitch, options.rate, options.lang, options.cooldownMs]
   );
 
   const stop = useCallback(() => {

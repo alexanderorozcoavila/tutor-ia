@@ -338,7 +338,10 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
     } else {
       const baseTask = dbTasksCache[tarea.modulo_id];
       if (baseTask) {
-        handleEstadoOptimistic(tarea, "en_revision");
+        // Si ya estaba en_revision (alumno salió a la mitad), retomar sin cambiar estado nuevamente
+        if (tarea.estado !== "en_revision") {
+          handleEstadoOptimistic(tarea, "en_revision");
+        }
         onStartModule(baseTask);
       }
     }
@@ -540,10 +543,13 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
 
             {tareasEnRevision.map(tarea => {
               const baseTask = dbTasksCache[tarea.modulo_id];
+              const esReanudable = tarea.tipo_modulo === "dictation" || tarea.tipo_modulo === "reading";
               return (
                 <div
                   key={tarea.id}
-                  className="bg-amber-50/50 p-6 rounded-[2rem] border-4 border-amber-100 opacity-90 flex items-center justify-between"
+                  onClick={() => esReanudable && handleCardClick(tarea)}
+                  className={`bg-amber-50/50 p-6 rounded-[2rem] border-4 border-amber-100 flex items-center justify-between
+                    ${esReanudable ? "cursor-pointer hover:bg-amber-100/60 active:scale-[0.98] transition-all" : "opacity-90"}`}
                 >
                   <div className="flex items-center gap-6">
                     <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-500 shadow-inner animate-pulse">
@@ -551,9 +557,16 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
                     </div>
                     <div>
                       <h4 className="text-2xl font-black text-amber-900">{baseTask ? baseTask.title : "Actividad Enviada"}</h4>
-                      <p className="text-amber-600 font-bold text-sm">El tutor la está revisando ⏳</p>
+                      <p className="text-amber-600 font-bold text-sm">
+                        {esReanudable ? "Toca para retomar donde lo dejaste ▶" : "El tutor la está revisando ⏳"}
+                      </p>
                     </div>
                   </div>
+                  {esReanudable && (
+                    <div className="w-14 h-14 bg-amber-400 text-white rounded-full flex items-center justify-center shadow-md flex-shrink-0">
+                      <span className="text-xl">▶</span>
+                    </div>
+                  )}
                 </div>
               );
             })}
