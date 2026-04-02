@@ -11,6 +11,7 @@ import { DomesticTaskModule } from "@/components/DomesticTaskModule";
 import { ReadingModule } from "@/components/ReadingModule";
 import { AssessmentModule } from "@/components/AssessmentModule";
 import { FullScreenWrapper } from "@/components/FullScreenWrapper";
+import { MinecraftModuleWrapper } from "@/components/MinecraftModuleWrapper";
 import { Task } from "@/lib/taskService";
 import { LogOut, Sparkles } from "lucide-react";
 
@@ -41,34 +42,53 @@ function AppContent() {
   }
 
   const renderRolePanel = () => {
+    const isMinecraft = user?.role === "student" && user?.theme?.slug === "minecraft";
+
     if (activeTask) {
+      let moduleContent: React.ReactNode;
+      let moduleTitle = "Misión";
+
       if (activeTask.type === "dictation") {
-        return (
+        moduleTitle = "Dictado";
+        moduleContent = (
           <DictationModule 
             taskId={activeTask.id} 
             initialText={activeTask.metadata.dictation_text} 
             initialConfig={activeTask.metadata.config}
             onFinish={() => setActiveTask(null)} 
+            theme={isMinecraft ? "minecraft" : undefined}
           />
         );
-      }
-      if (activeTask.type === "reading") {
-        return (
+      } else if (activeTask.type === "reading") {
+        moduleTitle = "Lectura";
+        moduleContent = (
           <ReadingModule 
             task={activeTask}
             onFinish={() => setActiveTask(null)}
+            theme={isMinecraft ? "minecraft" : undefined}
           />
         );
-      }
-      if (activeTask.type === "assessment") {
-        return (
+      } else if (activeTask.type === "assessment") {
+        moduleTitle = "Evaluación";
+        moduleContent = (
           <AssessmentModule 
             task={activeTask}
             onFinish={() => setActiveTask(null)}
+            theme={isMinecraft ? "minecraft" : undefined}
           />
         );
+      } else {
+        moduleContent = <DomesticTaskModule task={activeTask} onBack={() => setActiveTask(null)} />;
       }
-      return <DomesticTaskModule task={activeTask} onBack={() => setActiveTask(null)} />;
+
+      if (isMinecraft) {
+        return (
+          <MinecraftModuleWrapper moduleTitle={moduleTitle} onBack={() => setActiveTask(null)}>
+            {moduleContent}
+          </MinecraftModuleWrapper>
+        );
+      }
+      return moduleContent;
     }
 
     switch (user.role) {

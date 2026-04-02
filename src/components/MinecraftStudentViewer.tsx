@@ -7,8 +7,11 @@ import { useStudentPlan } from "@/hooks/useStudentPlan";
 import { useAuth } from "@/lib/AuthContext";
 import { 
   Gift, ClipboardSignature, Clock, CheckCircle2, 
-  MessageSquare, Phone, Medal, Trophy, LogOut, User, Home, Sword, Sparkles
+  MessageSquare, Phone, Medal, Trophy, LogOut, User, Home, Sword, Sparkles,
+  AlertTriangle, Loader2 as Spinner
 } from "lucide-react";
+import { systemMenuService, MenuAccion } from "@/lib/systemMenuService";
+import { useAlert } from "@/lib/AlertContext";
 import styles from "./MinecraftStudentViewer.module.css";
 
 interface Props {
@@ -19,6 +22,7 @@ interface Props {
 
 export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule }: Props) {
   const { user, logout } = useAuth();
+  const { showAlert } = useAlert();
   const {
     tareasCompletas,
     tareasEnRevision,
@@ -36,6 +40,41 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
     handleActivarRecompensa,
     handleCardClick,
   } = useStudentPlan(plan, onStartModule);
+
+  const [menuItems, setMenuItems] = React.useState<MenuAccion[]>([]);
+  const [executingId, setExecutingId] = React.useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (user?.role) {
+      systemMenuService.getMenuItems(user.role).then(setMenuItems).catch(console.error);
+    }
+  }, [user?.role]);
+
+  const handleSystemAction = async (item: MenuAccion) => {
+    const isCritical = item.nombre.toLowerCase().includes("apagar") || 
+                       item.nombre.toLowerCase().includes("reiniciar");
+    
+    if (isCritical && confirmingId !== item.id) {
+      setConfirmingId(item.id);
+      return;
+    }
+
+    setConfirmingId(null);
+    setExecutingId(item.id);
+    try {
+      const res = await systemMenuService.ejecutarAccion(item.id);
+      if (res.ok) {
+        showAlert(`✅ ${item.nombre} ejecutado`, { type: "success" });
+      } else {
+        showAlert(res.error || "Error al ejecutar", { type: "error" });
+      }
+    } catch (err) {
+      showAlert("El agente de sistema no responde.", { type: "error" });
+    } finally {
+      setExecutingId(null);
+    }
+  };
 
   // Ocultar SystemMenu global mediante CSS inyectado
   React.useEffect(() => {
@@ -255,6 +294,44 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
               <MessageSquare size={14} className="inline mr-2" /> WHATSAPP
             </button>
           </div>
+
+          {/* Acciones de Sistema */}
+          {menuItems.length > 0 && (
+            <div className={styles.sidebarBox} style={{ borderColor: "#444" }}>
+              <span className={styles.sidebarTitle}>SISTEMA</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {menuItems.map((item) => {
+                  const isConfirm = confirmingId === item.id;
+                  const isExec = executingId === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => handleSystemAction(item)}
+                      disabled={!!executingId}
+                      className={styles.sidebarBtn}
+                      style={{ 
+                        background: isConfirm ? "#c0392b" : "#2c3e50",
+                        borderColor: isConfirm ? "#e74c3c" : "#34495e",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.5rem",
+                        justifyContent: "center",
+                        fontSize: isConfirm ? "7px" : "8px"
+                      }}
+                    >
+                      {isExec ? (
+                        <Spinner size={14} className="animate-spin" />
+                      ) : (
+                        <span>{item.icono_emoji}</span>
+                      )}
+                      <span>{isConfirm ? `¿CONFIRMAR ${item.nombre.toUpperCase()}?` : item.nombre.toUpperCase()}</span>
+                      {isConfirm && <AlertTriangle size={12} className="ml-auto" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </aside>
 
       </main>

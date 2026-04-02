@@ -1,0 +1,102 @@
+.mcWrapper {
+  background-color: #1a1a2e;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-vt323), monospace;
+  color: white;
+  overflow-x: hidden;
+}
+
+.mcHeader {
+  background: #4a2c00;
+  border-bottom: 6px solid #8B5A00;
+  padding: 0 2rem;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  image-rendering: pixelated;
+}
+
+.headerLogoArea {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.mcLogo {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  grid-template-columns: repeat(4, 10px);
+  grid-template-rows: repeat(4, 10px);
+}
+
+.appTitle {
+  font-family: var(--font-pixel), monospace;
+  font-size: 14px;
+  color: #FFFF55;
+  text-shadow: 2px 2px #3b2300;
+}
+
+.moduleMeta {
+  font-family: var(--font-pixel), monospace;
+  font-size: 10px;
+  color: #aaffaa;
+}
+
+.mainContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.mcFooter {
+  background: #3b2300;
+  border-top: 4px solid #4a2c00;
+  padding: 1.5rem 2rem;
+  text-align: center;
+  margin-top: auto;
+}
+
+.footerContent {
+  opacity: 0.6;
+  font-size: 14px;
+}
+
+/* Global Minecraft Overrides for Modules */
+.mcBtn {
+  font-family: var(--font-pixel), monospace;
+  font-size: 10px;
+  padding: 1rem 2rem;
+  border: 4px solid;
+  cursor: pointer;
+  background: #2d5a1b;
+  border-color: #4a8a2a #1a3a0d #1a3a0d #4a8a2a;
+  color: #FFFF55;
+  transition: all 0.1s;
+}
+
+.mcBtn:active {
+  transform: translateY(2px);
+  border-color: #1a3a0d #4a8a2a #4a8a2a #1a3a0d;
+}
+
+.mcBox {
+  background: #4a2c00;
+  border: 4px solid #8B5A00;
+  border-right-color: #3b2300;
+  border-bottom-color: #3b2300;
+  padding: 2rem;
+  image-rendering: pixelated;
+  width: 100%;
+}

@@ -10,11 +10,13 @@ import confetti from "canvas-confetti";
 interface Props {
   task: Task;
   onFinish: () => void;
+  theme?: string;
 }
 
 type Mode = "INTRO" | "WIZARD" | "RESULTS";
 
-export function AssessmentModule({ task, onFinish }: Props) {
+export function AssessmentModule({ task, onFinish, theme }: Props) {
+  const isMinecraft = theme === "minecraft";
   const { showAlert } = useAlert();
   
   const questions: AssessmentQuestion[] = task.metadata?.questions || [];
@@ -131,14 +133,14 @@ export function AssessmentModule({ task, onFinish }: Props) {
   }
 
   return (
-    <div className="w-full max-w-3xl mx-auto min-h-[500px] flex flex-col justify-center animate-in fade-in duration-500">
+    <div className={`w-full max-w-3xl mx-auto min-h-[500px] flex flex-col justify-center animate-in fade-in duration-500 ${isMinecraft ? "font-vt323" : ""}`}>
       
       {mode === "INTRO" && (
-        <div className="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-purple-50">
-          <div className="w-24 h-24 mx-auto bg-purple-100 text-purple-600 rounded-full flex items-center justify-center mb-6">
+        <div className={`${isMinecraft ? "bg-[#3b2300] border-[#8B5A00] text-white" : "bg-white border-purple-50"} rounded-[3rem] p-12 text-center shadow-2xl border-4`}>
+          <div className={`w-24 h-24 mx-auto rounded-full flex items-center justify-center mb-6 ${isMinecraft ? "bg-[#4a2c00] text-yellow-400" : "bg-purple-100 text-purple-600"}`}>
             <ClipboardSignature size={48} />
           </div>
-          <h1 className="text-4xl font-black text-gray-900 mb-4">{task.title}</h1>
+          <h1 className={`text-4xl font-black mb-4 ${isMinecraft ? "text-white font-pixel text-xl" : "text-gray-900"}`}>{task.title}</h1>
           <p className="text-xl text-gray-500 mb-8">{task.description || "Lee bien cada pregunta y selecciona la mejor respuesta."}</p>
           
           <div className="flex justify-center gap-6 mb-10">
@@ -156,9 +158,13 @@ export function AssessmentModule({ task, onFinish }: Props) {
 
           <button 
             onClick={() => setMode("WIZARD")}
-            className="w-full md:w-auto px-16 py-6 bg-purple-600 hover:bg-purple-700 text-white rounded-full font-black text-2xl shadow-xl active:scale-95 transition-all"
+            className={`w-full md:w-auto px-16 py-6 rounded-full font-black text-2xl shadow-xl active:scale-95 transition-all ${
+              isMinecraft 
+              ? "bg-[#2d5a1b] border-4 border-[#1a3a0d] text-yellow-400 font-pixel text-lg" 
+              : "bg-purple-600 hover:bg-purple-700 text-white"
+            }`}
           >
-            ¡Empezar Prueba!
+            {isMinecraft ? "¡EMPEZAR MISIÓN!" : "¡Empezar Prueba!"}
           </button>
         </div>
       )}
@@ -166,22 +172,26 @@ export function AssessmentModule({ task, onFinish }: Props) {
       {mode === "WIZARD" && (
         <div className="space-y-6">
           <div className="flex justify-between items-center px-4">
-            <div className="font-bold text-purple-600 bg-purple-100 px-4 py-2 rounded-full">
+            <div className={`font-bold rounded-full px-4 py-2 ${isMinecraft ? "text-yellow-400 bg-[#3b2300] font-pixel text-[10px]" : "text-purple-600 bg-purple-100"}`}>
               Pregunta {currentIdx + 1} de {questions.length}
             </div>
             {timeLimit > 0 && (
-              <div className={`font-black flex items-center gap-2 px-4 py-2 rounded-full ${timeLeft <= 60 ? 'bg-red-100 text-red-600 animate-pulse' : 'bg-gray-100 text-gray-600'}`}>
+              <div className={`font-black flex items-center gap-2 px-4 py-2 rounded-full ${
+                timeLeft <= 60 
+                ? 'bg-red-100 text-red-600 animate-pulse' 
+                : isMinecraft ? 'bg-[#3b2300] text-white' : 'bg-gray-100 text-gray-600'
+              }`}>
                 <Clock size={18} /> {formatTime(timeLeft)}
               </div>
             )}
           </div>
 
-          <div className="bg-white rounded-[2rem] p-8 md:p-12 shadow-xl border-4 border-purple-50 transition-all">
-            <h2 className="text-3xl font-black text-gray-800 leading-tight mb-8">
+          <div className={`${isMinecraft ? "bg-[#3b2300] border-[#8B5A00] text-white" : "bg-white border-purple-50 shadow-xl"} rounded-[2rem] p-8 md:p-12 border-4 transition-all`}>
+            <h2 className={`text-3xl font-black leading-tight mb-8 ${isMinecraft ? "text-white" : "text-gray-800"}`}>
               {questions[currentIdx].text}
             </h2>
 
-            <div className="space-y-4">
+             <div className="space-y-4">
               {questions[currentIdx].options.map((opt, oIdx) => {
                 const isSelected = answers[currentIdx] === oIdx;
                 return (
@@ -190,15 +200,19 @@ export function AssessmentModule({ task, onFinish }: Props) {
                    onClick={() => handleSelectOption(oIdx)}
                    className={`w-full p-6 rounded-2xl border-4 text-left transition-all ${
                      isSelected 
-                      ? "border-purple-500 bg-purple-50 shadow-md ring-4 ring-purple-100 scale-[1.02]" 
-                      : "border-gray-100 hover:border-purple-200 hover:bg-gray-50"
+                      ? isMinecraft ? "border-yellow-400 bg-[#4a2c00] ring-4 ring-yellow-400/20" : "border-purple-500 bg-purple-50 shadow-md ring-4 ring-purple-100 scale-[1.02]" 
+                      : isMinecraft ? "border-[#8B5A00] hover:bg-[#4a2c00]/50 text-gray-300" : "border-gray-100 hover:border-purple-200 hover:bg-gray-50 text-gray-700"
                    }`}
                  >
                    <div className="flex items-center gap-4">
-                     <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${isSelected ? "border-purple-600 bg-purple-600" : "border-gray-300"}`}>
-                       {isSelected && <div className="w-3 h-3 bg-white rounded-full" />}
+                     <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all ${
+                       isSelected 
+                       ? isMinecraft ? "border-yellow-400 bg-yellow-400" : "border-purple-600 bg-purple-600" 
+                       : isMinecraft ? "border-[#8B5A00]" : "border-gray-300"
+                      }`}>
+                       {isSelected && <div className={`w-3 h-3 rounded-full ${isMinecraft ? "bg-[#3b2300]" : "bg-white"}`} />}
                      </div>
-                     <span className={`text-xl font-bold ${isSelected ? "text-purple-900" : "text-gray-700"}`}>
+                     <span className={`text-xl font-bold ${isSelected ? (isMinecraft ? "text-yellow-400" : "text-purple-900") : ""}`}>
                        {opt}
                      </span>
                    </div>
@@ -211,9 +225,13 @@ export function AssessmentModule({ task, onFinish }: Props) {
               <button
                 onClick={handleNext}
                 disabled={isSubmitting}
-                className="px-10 py-5 bg-gray-900 hover:bg-black text-white rounded-full font-black text-xl flex items-center gap-3 active:scale-95 disabled:opacity-50 transition-all shadow-lg"
+                className={`px-10 py-5 rounded-full font-black text-xl flex items-center gap-3 active:scale-95 disabled:opacity-50 transition-all shadow-lg ${
+                  isMinecraft 
+                  ? "bg-[#2d5a1b] border-2 border-[#1a3a0d] text-yellow-400 font-pixel text-sm" 
+                  : "bg-gray-900 hover:bg-black text-white"
+                }`}
               >
-                {isSubmitting ? "Guardando..." : currentIdx === questions.length - 1 ? "Terminar Evaluación" : "Siguiente"} 
+                {isSubmitting ? "Guardando..." : currentIdx === questions.length - 1 ? (isMinecraft ? "TERMINAR MISIÓN" : "Terminar Evaluación") : (isMinecraft ? "SIGUIENTE" : "Siguiente")} 
                 {!isSubmitting && <ArrowRight />}
               </button>
             </div>
@@ -223,23 +241,27 @@ export function AssessmentModule({ task, onFinish }: Props) {
 
       {mode === "RESULTS" && (
         <div className="space-y-6">
-          <div className="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-emerald-50 relative overflow-hidden">
-            <div className="text-emerald-500 flex justify-center mb-4">
+          <div className={`rounded-[3rem] p-12 text-center border-4 relative overflow-hidden ${isMinecraft ? "bg-[#3b2300] border-[#8B5A00] text-white" : "bg-white border-emerald-50 shadow-2xl"}`}>
+            <div className={`flex justify-center mb-4 ${isMinecraft ? "text-yellow-400" : "text-emerald-500"}`}>
               <Star fill="currentColor" size={64} />
             </div>
-            <h1 className="text-4xl font-black text-gray-900 mb-2">Evaluación Finalizada</h1>
-            <p className="text-gray-500 font-bold mb-8">¡El tutor revisará tus resultados!</p>
+            <h1 className={`text-4xl font-black mb-2 ${isMinecraft ? "text-white font-pixel" : "text-gray-900"}`}>{isMinecraft ? "MISIÓN FINALIZADA" : "Evaluación Finalizada"}</h1>
+            <p className={`font-bold mb-8 ${isMinecraft ? "text-green-400" : "text-gray-500"}`}>¡El tutor revisará tus resultados!</p>
             
-            <div className="inline-block bg-emerald-50 border-4 border-emerald-100 rounded-[2rem] p-8 mb-8">
-               <div className="text-sm font-black text-emerald-600 uppercase tracking-widest mb-2">Nota Final</div>
-               <div className="text-7xl font-black text-emerald-600">{finalScore.toFixed(1)}</div>
+            <div className={`inline-block border-4 rounded-[2rem] p-8 mb-8 ${isMinecraft ? "bg-[#4a2c00] border-[#8B5A00]" : "bg-emerald-50 border-emerald-100"}`}>
+               <div className={`text-sm font-black uppercase tracking-widest mb-2 ${isMinecraft ? "text-yellow-400" : "text-emerald-600"}`}>Nota Final</div>
+               <div className={`text-7xl font-black ${isMinecraft ? "text-white" : "text-emerald-600"}`}>{finalScore.toFixed(1)}</div>
             </div>
 
             <button 
               onClick={onFinish}
-              className="w-full md:w-auto px-16 py-6 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-black text-2xl shadow-xl active:scale-95 transition-all"
+              className={`w-full md:w-auto px-16 py-6 rounded-full font-black text-2xl shadow-xl active:scale-95 transition-all ${
+                isMinecraft 
+                ? "bg-[#2d5a1b] border-4 border-[#1a3a0d] text-yellow-400 font-pixel text-lg" 
+                : "bg-emerald-500 hover:bg-emerald-600 text-white"
+              }`}
             >
-              Volver al Menú
+              {isMinecraft ? "VOLVER AL ESCRITORIO" : "Volver al Menú"}
             </button>
           </div>
 

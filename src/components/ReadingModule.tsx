@@ -12,9 +12,11 @@ import { Loader2, Mic, Volume2, Star, CheckCircle2, BookOpen } from "lucide-reac
 interface Props {
   task: Task;
   onFinish: () => void;
+  theme?: string;
 }
 
-export function ReadingModule({ task, onFinish }: Props) {
+export function ReadingModule({ task, onFinish, theme }: Props) {
+  const isMinecraft = theme === "minecraft";
   const { showAlert } = useAlert();
   const { speak, isSpeaking, diagnostic } = useTTS();
   const { addXP } = useSession();
@@ -113,8 +115,9 @@ export function ReadingModule({ task, onFinish }: Props) {
   };
 
   return (
-    <div className="w-full flex flex-col items-center gap-4 md:gap-8 max-w-4xl mx-auto py-4 md:py-12 px-2 md:px-4 select-none touch-none overflow-hidden h-full">
-      <ProgressBar />
+    <div className={`w-full flex flex-col items-center gap-4 md:gap-8 max-w-4xl mx-auto py-4 md:py-12 px-2 md:px-4 select-none touch-none overflow-hidden h-full ${isMinecraft ? "font-vt323" : ""}`}>
+      {/* ProgressBar could also be themed later if needed */}
+      {!isMinecraft && <ProgressBar />}
 
       {/* === Banner de diagnóstico TTS === */}
       {(diagnostic.status !== "ok" && diagnostic.status !== "checking") && (
@@ -134,23 +137,22 @@ export function ReadingModule({ task, onFinish }: Props) {
         </div>
       )}
       
-      <div className="bg-white/90 backdrop-blur-md p-4 md:p-12 rounded-[2rem] md:rounded-[3.5rem] shadow-2xl border-4 border-amber-50 flex flex-col items-center gap-4 md:gap-10 w-full flex-grow md:min-h-[500px]">
+      <div className={`${isMinecraft ? "bg-[#3b2300] border-[#8B5A00]" : "bg-white/90 border-amber-50 backdrop-blur-md shadow-2xl"} p-4 md:p-12 rounded-[2rem] md:rounded-[3.5rem] border-4 flex flex-col items-center gap-4 md:gap-10 w-full flex-grow md:min-h-[500px]`}>
         
-        {/* Etiqueta y Título */}
         <div className="flex flex-col items-center gap-2 w-full shrink-0">
-          <div className="px-4 py-1.5 md:px-6 md:py-2 bg-amber-100 text-amber-600 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-widest flex items-center gap-2">
-            <BookOpen size={14} /> ¡A Leer!
+          <div className={`px-4 py-1.5 md:px-6 md:py-2 rounded-full font-bold text-[10px] md:text-sm uppercase tracking-widest flex items-center gap-2 ${isMinecraft ? "bg-[#2d5a1b] text-yellow-400" : "bg-amber-100 text-amber-600"}`}>
+            <BookOpen size={14} /> {isMinecraft ? "MISIÓN DE LECTURA" : "¡A Leer!"}
           </div>
-          <h2 className="text-xl md:text-2xl font-black text-gray-800 tracking-tight text-center truncate w-full">
+          <h2 className={`text-xl md:text-2xl font-black tracking-tight text-center truncate w-full ${isMinecraft ? "text-white font-pixel text-sm" : "text-gray-800"}`}>
             {task.title}
           </h2>
         </div>
 
         {/* Zona del Texto Gigante */}
-        <div className="w-full bg-amber-50/50 p-4 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border-2 border-amber-100 shadow-inner flex shrink-0 items-center justify-center h-[20vh] md:min-h-[150px] overflow-y-auto">
+        <div className={`w-full p-4 md:p-8 rounded-[1.5rem] md:rounded-[2rem] border-2 shadow-inner flex shrink-0 items-center justify-center h-[20vh] md:min-h-[150px] overflow-y-auto ${isMinecraft ? "bg-[#4a2c00] border-[#8B5A00]" : "bg-amber-50/50 border-amber-100"}`}>
           <p 
-            className="font-black text-center text-gray-800 leading-tight md:leading-relaxed mx-auto w-full break-words"
-            style={{ fontFamily: "'Comic Neue', 'Arial Rounded MT Bold', sans-serif", fontSize: 'clamp(1.2rem, 4vh, 2.5rem)' }}
+            className={`font-black text-center leading-tight md:leading-relaxed mx-auto w-full break-words ${isMinecraft ? "text-white" : "text-gray-800"}`}
+            style={isMinecraft ? { fontSize: 'clamp(1.2rem, 4vh, 2.5rem)' } : { fontFamily: "'Comic Neue', 'Arial Rounded MT Bold', sans-serif", fontSize: 'clamp(1.2rem, 4vh, 2.5rem)' }}
           >
             {textToRead}
           </p>
@@ -183,13 +185,13 @@ export function ReadingModule({ task, onFinish }: Props) {
                     relative w-40 h-24 md:w-64 md:h-40 rounded-[2rem] md:rounded-[3rem] shadow-[0_8px_0_0_rgba(0,0,0,0.1)] transition-all flex flex-col items-center justify-center gap-1 md:gap-2 select-none mx-auto
                     ${state === "RECORDING" 
                       ? "bg-red-500 hover:bg-red-600 text-white translate-y-2 shadow-[0_2px_0_0_rgba(0,0,0,0.1)] scale-95" 
-                      : "bg-blue-500 hover:bg-blue-600 text-white hover:translate-y-1 hover:shadow-[0_6px_0_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-[0_2px_0_0_rgba(0,0,0,0.1)] cursor-pointer"
+                      : isMinecraft ? "bg-[#2d5a1b] border-4 border-[#1a3a0d] text-yellow-400 hover:bg-[#3d7a2b]" : "bg-blue-500 hover:bg-blue-600 text-white hover:translate-y-1 hover:shadow-[0_6px_0_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-[0_2px_0_0_rgba(0,0,0,0.1)] cursor-pointer"
                     }
                   `}
                 >
                   <Mic size={36} className={`md:w-12 md:h-12 ${state === "RECORDING" ? "animate-pulse" : ""}`} />
-                  <span className="font-black text-sm md:text-xl uppercase tracking-wider text-center px-4 leading-tight">
-                    {state === "RECORDING" ? "¡Habla!" : "Pulsar y Leer"}
+                  <span className={`font-black text-sm md:text-xl uppercase tracking-wider text-center px-4 leading-tight ${isMinecraft ? "font-pixel text-[10px]" : ""}`}>
+                    {state === "RECORDING" ? "¡Habla!" : isMinecraft ? "LEER AHORA" : "Pulsar y Leer"}
                   </span>
                 </button>
               </div>

@@ -30,9 +30,11 @@ interface Props {
   initialText?: string;
   initialConfig?: Config;
   onFinish?: () => void;
+  theme?: string;
 }
 
-export function DictationModule({ taskId, initialText, initialConfig, onFinish }: Props) {
+export function DictationModule({ taskId, initialText, initialConfig, onFinish, theme }: Props) {
+  const isMinecraft = theme === "minecraft";
   const { showAlert: globalAlert } = useAlert();
   // Calcular el step inicial y el índice inicial antes de montar el estado.
   // Si la tarea tiene texto y config (modo reanudación), leemos el progreso guardado
@@ -502,9 +504,9 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
   if (step === "CONFIG") {
     return (
       <div className="w-full max-w-4xl mx-auto p-8 animate-in zoom-in-95 duration-500">
-        <div className="bg-white rounded-[3rem] p-12 shadow-2xl border-4 border-indigo-100 flex flex-col items-center gap-8">
-          <Settings size={48} className="text-indigo-500 animate-spin-slow" />
-          <h2 className="text-3xl font-black text-gray-900">Configura tu dictado</h2>
+        <div className={`${isMinecraft ? "bg-[#4a2c00] border-[#8B5A00] text-white" : "bg-white border-indigo-100"} rounded-[3rem] p-12 shadow-2xl border-4 flex flex-col items-center gap-8`}>
+          <Settings size={48} className={isMinecraft ? "text-yellow-400 animate-spin-slow" : "text-indigo-500 animate-spin-slow"} />
+          <h2 className={`text-3xl font-black ${isMinecraft ? "text-yellow-400 font-pixel" : "text-gray-900"}`} style={isMinecraft ? { fontSize: '18px' } : {}}>Configura tu dictado</h2>
 
           <div className="w-full space-y-8">
             {/* Selector de Modo */}
@@ -576,7 +578,11 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
 
           <button
             onClick={startDictation}
-            className="w-full py-6 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-full font-black text-2xl shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3"
+            className={`w-full py-6 rounded-full font-black shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3 ${
+              isMinecraft 
+              ? "bg-[#2d5a1b] border-4 border-[#4a8a2a] text-yellow-400 font-pixel text-lg" 
+              : "bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-2xl"
+            }`}
           >
             <Play fill="currentColor" /> ¡Empezar Dictado!
           </button>
@@ -639,30 +645,34 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
         )}
 
         {/* === Barra Superior Anclada: Controles Multimedia Directos === */}
-        <div className="sticky top-20 z-[100] bg-white/90 backdrop-blur-xl p-4 md:px-8 rounded-[2rem] shadow-xl shadow-indigo-100/50 border-2 border-indigo-50 flex items-center justify-between mb-4">
+        <div className={`sticky top-2 z-[100] ${isMinecraft ? "bg-[#4a2c00]/90 border-[#8B5A00]" : "bg-white/90 border-indigo-50"} backdrop-blur-xl p-4 md:px-8 rounded-[2rem] shadow-xl border-2 flex items-center justify-between mb-4`}>
           <div className="flex items-center gap-4">
             <button
               onClick={() => speak(phrases[currentIndex])}
               disabled={isSpeaking}
-              className="p-4 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 active:scale-95 transition-all shadow-sm disabled:opacity-50"
+              className={`p-4 rounded-full active:scale-95 transition-all shadow-sm disabled:opacity-50 ${isMinecraft ? "bg-[#3b2300] text-yellow-400 border-2 border-[#8B5A00]" : "bg-indigo-50 text-indigo-600"}`}
               title="Escuchar frase de nuevo"
             >
               <RefreshCcw size={24} />
             </button>
-            <div className="h-8 w-px bg-indigo-100 hidden sm:block"></div>
+            <div className={`h-8 w-px hidden sm:block ${isMinecraft ? "bg-[#8B5A00]" : "bg-indigo-100"}`}></div>
             <button
               onMouseDown={startRecording}
               onMouseUp={stopRecording}
-              className={`p-4 rounded-full transition-all shadow-md active:scale-90 ${isRecording ? "bg-red-500 text-white animate-pulse shadow-red-200" : "bg-blue-50 text-blue-600 hover:bg-blue-100"}`}
+              className={`p-4 rounded-full transition-all shadow-md active:scale-90 ${
+                isRecording 
+                ? "bg-red-500 text-white animate-pulse shadow-red-200" 
+                : isMinecraft ? "bg-[#2d5a1b] text-yellow-400 border-2 border-[#4a8a2a]" : "bg-blue-50 text-blue-600 hover:bg-blue-100"
+              }`}
               title="Mantén para decir: 'Ya copié'"
             >
-              {isListening ? <Loader2 className="animate-spin text-blue-600" size={24} /> : <Play size={24} />}
+              {isListening ? <Loader2 className="animate-spin" size={24} /> : <Play size={24} />}
             </button>
           </div>
 
           <div className="hidden md:flex flex-col items-center">
-            <span className="text-xs font-black text-indigo-300 uppercase tracking-widest">Dictado en Progreso</span>
-            <div className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+            <span className={`text-xs font-black uppercase tracking-widest ${isMinecraft ? "text-green-400" : "text-indigo-300"}`}>Misión en curso</span>
+            <div className={`text-sm font-bold flex items-center gap-2 ${isMinecraft ? "text-white" : "text-indigo-900"}`}>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /> Frase {currentIndex + 1} de {phrases.length}
             </div>
           </div>
@@ -670,7 +680,11 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
           <button
             onClick={handleNext}
             disabled={isLocked}
-            className={`px-8 py-4 rounded-full font-black text-lg shadow-lg active:scale-95 transition-all flex items-center gap-2 ${isLocked ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-80 shadow-none border-2 border-transparent" : "bg-gradient-to-r from-emerald-400 to-green-500 text-white hover:shadow-green-200"}`}
+            className={`px-8 py-4 rounded-full font-black text-lg shadow-lg active:scale-95 transition-all flex items-center gap-2 ${
+              isLocked 
+              ? "bg-gray-100 text-gray-400 cursor-not-allowed opacity-80 shadow-none border-2 border-transparent" 
+              : isMinecraft ? "bg-[#2d5a1b] border-2 border-[#4a8a2a] text-yellow-400 font-pixel text-sm" : "bg-gradient-to-r from-emerald-400 to-green-500 text-white hover:shadow-green-200"
+            }`}
           >
             {isLocked ? (isSpeaking ? "Escucha..." : "Espera...") : "¡Siguiente!"} {!isLocked && <CheckCircle2 size={24} />}
           </button>
@@ -694,7 +708,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish }
           />
         </div>
 
-        <div className={`bg-white rounded-[4rem] p-16 shadow-2xl border-4 relative overflow-hidden flex flex-col items-center ${config.mode === "TEMPORIZADOR" ? "border-red-50" : "border-blue-50"}`}>
+        <div className={`bg-white rounded-[4rem] p-16 shadow-2xl border-4 relative overflow-hidden flex flex-col items-center ${isMinecraft ? "border-[#8B5A00] bg-[#3b2300]" : config.mode === "TEMPORIZADOR" ? "border-red-50" : "border-blue-50"}`}>
 
           <div className="flex items-center gap-4 mb-12">
             <span className={`px-6 py-2 rounded-full font-black text-sm uppercase tracking-widest ${config.mode === "TEMPORIZADOR" ? "bg-red-100 text-red-600" : "bg-blue-100 text-blue-600"}`}>
