@@ -13,6 +13,7 @@ export interface Recompensa {
   url?: string;
   comando?: string;
   tipo: 'url' | 'comando';
+  dispositivo_objetivo?: 'pc' | 'tablet' | 'mobile' | 'all';
   created_by?: string;
   created_at: string;
 }

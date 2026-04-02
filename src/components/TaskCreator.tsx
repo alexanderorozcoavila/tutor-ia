@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { taskService, TaskType } from "@/lib/taskService";
+import { taskService, TaskType, StemKnowledgeItem } from "@/lib/taskService";
+import { stemService } from "@/lib/stemService";
 import { 
   CheckCircle2, Clock, BookOpen, 
   Home, Star, Settings, Plus, X,
   ChevronRight, AlertCircle, Loader2, DatabaseZap,
   Laptop, Tablet, Smartphone, MonitorX, Camera, ImageIcon,
-  BookA, Save, Database, Calendar
+  BookA, Save, Database, Calendar, FlaskConical
 } from "lucide-react";
 import { RichTextEditor } from "@/components/RichTextEditor";
 import { useAuth } from "@/lib/AuthContext";
@@ -41,6 +42,14 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   const [availablePlans, setAvailablePlans] = useState<PlanSemanal[]>([]);
   const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   const [planDays, setPlanDays] = useState<number[]>([]);
+  
+  // STEM State
+  const [stemItems, setStemItems] = useState<StemKnowledgeItem[]>([]);
+  const [selectedStemId, setSelectedStemId] = useState("");
+
+  useEffect(() => {
+    stemService.getKnowledgeBaseItems().then(items => setStemItems(items)).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (user && studentId) {
@@ -86,6 +95,7 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
     if (!title) return showAlert("Por favor ponle un título a la tarea.", { type: "info" });
     if (type === "dictation" && !dictationText) return showAlert("El dictado necesita un texto.", { type: "info" });
     if (type === "reading" && !readingText) return showAlert("La actividad de lectura necesita un texto.", { type: "info" });
+    if (type === "stem" && !selectedStemId) return showAlert("Selecciona un tema para la actividad de Ciencias o Matemáticas.", { type: "info" });
 
     setIsSaving(true);
     let metadata: any = {};
@@ -104,6 +114,13 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
       metadata = {
         reading_text: readingText,
         reading_level: readingLevel
+      };
+    } else if (type === "stem") {
+      const selectedStemItem = stemItems.find(i => i.id === selectedStemId);
+      metadata = {
+        stem_item_id: selectedStemItem?.id,
+        stem_category: selectedStemItem?.category,
+        interactive_type: selectedStemItem?.interactive_type,
       };
     }
 
@@ -170,6 +187,12 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
             className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-4 rounded-xl font-bold transition-all ${type === "domestic" ? "bg-white shadow-md text-emerald-600" : "text-gray-400"}`}
           >
             <Home size={20} /> Del Hogar
+          </button>
+          <button
+            onClick={() => { setType("stem"); if (stemItems.length && !title) setTitle("Exploración: " + stemItems[0].title); }}
+            className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-4 rounded-xl font-bold transition-all ${type === "stem" ? "bg-white shadow-md text-cyan-600" : "text-gray-400"}`}
+          >
+            <FlaskConical size={20} /> Ciencias/Mate
           </button>
         </div>
 
@@ -362,6 +385,48 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
                 placeholder="Escribe aquí el texto a leer, o selecciona un nivel arriba..."
                 className="w-full p-4 rounded-2xl border-2 border-amber-100 bg-white focus:border-amber-300 focus:outline-none transition-all h-32 resize-none font-medium text-lg leading-relaxed"
               />
+            </div>
+          </div>
+        )}
+
+        {type === "stem" && (
+          <div className="space-y-6 animate-in slide-in-from-top-2 bg-cyan-50/30 p-6 rounded-[2rem] border-2 border-cyan-100">
+            <div className="space-y-4">
+              <label className="text-sm font-black text-gray-400 uppercase tracking-wider">Base de Conocimientos</label>
+              
+              <select 
+                value={selectedStemId} 
+                onChange={e => {
+                  setSelectedStemId(e.target.value);
+                  const selected = stemItems.find(i => i.id === e.target.value);
+                  if (selected && !title.includes(selected.title)) {
+                    setTitle("Exploración: " + selected.title);
+                  }
+                }}
+                className="w-full p-4 rounded-2xl bg-white border-2 border-cyan-100 focus:border-cyan-400 outline-none font-bold text-gray-700"
+              >
+                <option value="" disabled>Selecciona un tema para explorar...</option>
+                {['math', 'geometry', 'science'].map(cat => {
+                  const catItems = stemItems.filter(i => i.category === cat);
+                  if (catItems.length === 0) return null;
+                  return (
+                    <optgroup key={cat} label={cat === 'math' ? 'Matemáticas' : cat === 'geometry' ? 'Geometría' : 'Ciencias'}>
+                      {catItems.map(item => (
+                        <option key={item.id} value={item.id}>{item.title}</option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+
+              {selectedStemId && (
+                <div className="bg-white p-4 rounded-xl border border-cyan-100">
+                  <p className="text-sm font-bold text-gray-600">
+                    <FlaskConical size={14} className="inline mr-1 text-cyan-500" />
+                    El alumno interactuará con el módulo de: {stemItems.find(i => i.id === selectedStemId)?.title}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 
-export type TaskType = 'dictation' | 'domestic' | 'reading' | 'assessment';
+export type TaskType = 'dictation' | 'domestic' | 'reading' | 'assessment' | 'stem';
 export type TaskStatus = 'pending' | 'completed' | 'failed' | 'approved' | 'rejected';
 
 export interface AssessmentQuestion {
@@ -39,6 +39,16 @@ export interface Task {
     };
     [key: string]: any;
   };
+}
+
+export interface StemKnowledgeItem {
+  id: string;
+  category: string;
+  title: string;
+  content_html: string;
+  interactive_type: string;
+  metadata: any;
+  created_at: string;
 }
 
 const LS_KEY = 'ia_tutor_tasks';

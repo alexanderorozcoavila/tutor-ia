@@ -10,6 +10,7 @@ import { DictationModule } from "@/components/DictationModule";
 import { DomesticTaskModule } from "@/components/DomesticTaskModule";
 import { ReadingModule } from "@/components/ReadingModule";
 import { AssessmentModule } from "@/components/AssessmentModule";
+import { StemModule } from "@/components/StemModule";
 import { FullScreenWrapper } from "@/components/FullScreenWrapper";
 import { MinecraftModuleWrapper } from "@/components/MinecraftModuleWrapper";
 import { Task } from "@/lib/taskService";
@@ -77,6 +78,9 @@ function AppContent() {
             theme={isMinecraft ? "minecraft" : undefined}
           />
         );
+      } else if (activeTask.type === "stem") {
+        moduleTitle = "Ciencia y Mate";
+        moduleContent = <StemModule task={activeTask} onBack={() => setActiveTask(null)} />;
       } else {
         moduleContent = <DomesticTaskModule task={activeTask} onBack={() => setActiveTask(null)} />;
       }

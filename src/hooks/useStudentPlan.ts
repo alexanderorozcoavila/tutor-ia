@@ -87,7 +87,18 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
     // Recompensas del día
     try {
       const rds = await rewardService.getRecompensasDiarias(plan.id!);
-      const hoyRDs = rds.filter(rd => rd.dia_semana === today);
+      
+      // Filter out rewards not meant for the current device
+      const isWindowAvailable = typeof window !== 'undefined';
+      const width = isWindowAvailable ? window.innerWidth : 1024;
+      const deviceType = width < 768 ? 'mobile' : width < 1024 ? 'tablet' : 'pc';
+
+      const hoyRDs = rds.filter(rd => {
+        if (rd.dia_semana !== today) return false;
+        const target = rd.recompensa?.dispositivo_objetivo;
+        return !target || target === 'all' || target === deviceType;
+      });
+
       setRecompensasDelDia(hoyRDs as any);
 
       // Cargar usos ya existentes desde BD → evita re-activación tras recarga de página

@@ -54,6 +54,7 @@ export function AdminPanel() {
   const [rwUrl, setRwUrl] = useState("");
   const [rwComando, setRwComando] = useState("");
   const [rwImagenUrl, setRwImagenUrl] = useState("");
+  const [rwDispositivoObjetivo, setRwDispositivoObjetivo] = useState<"all" | "pc" | "tablet" | "mobile">("all");
   const rwImagenRef = useRef<HTMLInputElement>(null);
 
   // Configurar Dispositivo (Kiosco)
@@ -140,6 +141,7 @@ export function AdminPanel() {
     setRwUrl("");
     setRwComando("");
     setRwImagenUrl("");
+    setRwDispositivoObjetivo("all");
   };
 
   const handleRecompensaSubmit = async (e: React.FormEvent) => {
@@ -158,6 +160,7 @@ export function AdminPanel() {
         url: rwTipo === 'url' ? rwUrl.trim() : undefined,
         comando: rwTipo === 'comando' ? rwComando.trim() : undefined,
         imagen_url: rwImagenUrl.trim() || undefined,
+        dispositivo_objetivo: rwDispositivoObjetivo,
       };
       if (editingRecompensa) {
         await rewardService.updateRecompensa(editingRecompensa.id, payload);
@@ -631,6 +634,19 @@ export function AdminPanel() {
                     </select>
                   </div>
                 </div>
+                <div>
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 block">Dispositivo Objetivo *</label>
+                  <select
+                    value={rwDispositivoObjetivo}
+                    onChange={e => setRwDispositivoObjetivo(e.target.value as any)}
+                    className="w-full p-4 rounded-xl bg-gray-50 border-2 border-transparent focus:border-amber-200 outline-none font-bold text-gray-700"
+                  >
+                    <option value="all">🖥️ Todos los equipos</option>
+                    <option value="pc">💻 Solo PC</option>
+                    <option value="tablet">📱 Solo Tablet</option>
+                    <option value="mobile">📲 Solo Celular</option>
+                  </select>
+                </div>
               </div>
 
               {/* Columna Derecha */}
@@ -755,6 +771,7 @@ export function AdminPanel() {
                           setRwUrl(r.url || "");
                           setRwComando(r.comando || "");
                           setRwImagenUrl(r.imagen_url || "");
+                          setRwDispositivoObjetivo(r.dispositivo_objetivo || "all");
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                         }}
                         className="flex-1 py-2.5 bg-white text-amber-600 rounded-xl font-black text-xs border-2 border-amber-100 hover:bg-amber-50 transition-all flex items-center justify-center gap-1"
