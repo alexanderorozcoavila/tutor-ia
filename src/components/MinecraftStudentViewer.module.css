@@ -214,6 +214,42 @@
   display: inline-block;
 }
 
+.mcCheckboxWrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mcCheckboxHidden {
+  display: none;
+}
+
+.mcCheckboxCustom {
+  width: 24px;
+  height: 24px;
+  background: var(--mc-brown-dark);
+  border: 3px solid var(--mc-brown-light);
+  position: relative;
+  image-rendering: pixelated;
+}
+
+.mcCheckboxChecked::after {
+  content: '';
+  position: absolute;
+  top: 3px; left: 3px; right: 3px; bottom: 3px;
+  background: var(--mc-xp-green);
+  box-shadow: 0 0 5px var(--mc-xp-green);
+}
+
+.mcCheckboxLabel {
+  font-family: var(--font-pixel), monospace;
+  font-size: 10px;
+  color: var(--mc-xp-green);
+  letter-spacing: 1px;
+}
+
 .horizontalGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));

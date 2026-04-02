@@ -160,6 +160,8 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
     handleCardClick,
   } = useStudentPlan(plan, onStartModule);
 
+  const [onlyPending, setOnlyPending] = useState(false);
+
 
 
   return (
@@ -288,40 +290,55 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
       {/* ── EVALUACIONES SEMANALES ───────────────────────────────────────────── */}
       {evaluacionesSemanales.length > 0 && (
         <div className="space-y-4">
-          <h3 className="text-xl font-black text-purple-400 uppercase tracking-widest pl-4">Retos de la Semana</h3>
+          <div className="flex items-center justify-between px-4">
+            <h3 className="text-xl font-black text-purple-400 uppercase tracking-widest">Retos de la Semana</h3>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {evaluacionesSemanales.map((evalu: any) => {
-              const isCompletada = evalu.estado === "completada";
-              return (
-                <div
-                  key={evalu.id}
-                  onClick={() => !isCompletada && handleCardClick(evalu)}
-                  className={`group p-6 theme-card transition-all flex items-center justify-between ${
-                    isCompletada ? "opacity-70 grayscale" : "cursor-pointer active:scale-[0.98]"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isCompletada ? "bg-purple-200 text-white" : "bg-purple-50 text-purple-500"}`}>
-                      <ClipboardSignature size={28} />
+            {evaluacionesSemanales
+              .filter((evalu: any) => !onlyPending || evalu.estado !== "completada")
+              .map((evalu: any) => {
+                const isCompletada = evalu.estado === "completada";
+                return (
+                  <div
+                    key={evalu.id}
+                    onClick={() => !isCompletada && handleCardClick(evalu)}
+                    className={`group p-6 theme-card transition-all flex items-center justify-between ${
+                      isCompletada ? "opacity-70 grayscale" : "cursor-pointer active:scale-[0.98]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isCompletada ? "bg-purple-200 text-white" : "bg-purple-50 text-purple-500"}`}>
+                        <ClipboardSignature size={28} />
+                      </div>
+                      <div>
+                        <h4 className={`text-xl font-extrabold ${isCompletada ? "text-purple-900 line-through" : "text-gray-800"}`}>
+                          {isCompletada ? "Evaluación Realizada" : "Evaluación Semanal"}
+                        </h4>
+                        <p className="text-purple-500 font-bold text-xs uppercase">+{evalu.puntos_valor} puntos</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className={`text-xl font-extrabold ${isCompletada ? "text-purple-900 line-through" : "text-gray-800"}`}>
-                        {isCompletada ? "Evaluación Realizada" : "Evaluación Semanal"}
-                      </h4>
-                      <p className="text-purple-500 font-bold text-xs uppercase">+{evalu.puntos_valor} puntos</p>
-                    </div>
+                    {isCompletada && <CheckCircle2 className="text-purple-500" size={24} />}
                   </div>
-                  {isCompletada && <CheckCircle2 className="text-purple-500" size={24} />}
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </div>
       )}
 
       {/* ── TAREAS DEL DÍA ───────────────────────────────────────────────────── */}
       <div className="space-y-4">
-        <h3 className="text-xl font-black text-gray-400 uppercase tracking-widest pl-4">Aventuras de Hoy</h3>
+        <div className="flex items-center justify-between px-4 mb-2">
+          <h3 className="text-xl font-black text-gray-400 uppercase tracking-widest">Aventuras de Hoy</h3>
+          <label className="flex items-center gap-2 cursor-pointer group">
+            <div className={`w-10 h-6 rounded-full p-1 transition-colors duration-300 ${onlyPending ? 'bg-emerald-500' : 'bg-gray-300'}`}
+              onClick={() => setOnlyPending(!onlyPending)}>
+              <div className={`w-4 h-4 bg-white rounded-full transition-transform duration-300 transform ${onlyPending ? 'translate-x-4' : 'translate-x-0'}`} />
+            </div>
+            <span className="text-xs font-black text-gray-400 uppercase tracking-wider group-hover:text-emerald-600 transition-colors">
+              Solo Pendientes
+            </span>
+          </label>
+        </div>
 
         {tareasPendientes.length === 0 && tareasCompletas.length === 0 && tareasEnRevision.length === 0 ? (
           <div className="bg-gray-50/50 border-4 border-dashed border-gray-200 p-12 rounded-[3rem] text-center flex flex-col items-center gap-4">
@@ -353,58 +370,62 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
               );
             })}
 
-            {tareasEnRevision.map((tarea: any) => {
-              const baseTask = dbTasksCache[tarea.modulo_id];
-              const esReanudable = tarea.tipo_modulo === "dictation" || tarea.tipo_modulo === "reading";
-              return (
-                <div
-                  key={tarea.id}
-                  onClick={() => esReanudable && handleCardClick(tarea)}
-                  className={`bg-amber-50/50 p-6 rounded-[2rem] border-4 border-amber-100 flex items-center justify-between
-                    ${esReanudable ? "cursor-pointer hover:bg-amber-100/60 active:scale-[0.98] transition-all" : "opacity-90"}`}
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-500 shadow-inner animate-pulse">
-                      <Clock size={32} />
+            {tareasEnRevision
+              .filter(() => !onlyPending)
+              .map((tarea: any) => {
+                const baseTask = dbTasksCache[tarea.modulo_id];
+                const esReanudable = tarea.tipo_modulo === "dictation" || tarea.tipo_modulo === "reading";
+                return (
+                  <div
+                    key={tarea.id}
+                    onClick={() => esReanudable && handleCardClick(tarea)}
+                    className={`bg-amber-50/50 p-6 rounded-[2rem] border-4 border-amber-100 flex items-center justify-between
+                      ${esReanudable ? "cursor-pointer hover:bg-amber-100/60 active:scale-[0.98] transition-all" : "opacity-90"}`}
+                  >
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center text-amber-500 shadow-inner animate-pulse">
+                        <Clock size={32} />
+                      </div>
+                      <div>
+                        <h4 className="text-2xl font-black text-amber-900">{baseTask ? baseTask.title : "Actividad Enviada"}</h4>
+                        <p className="text-amber-600 font-bold text-sm">
+                          {esReanudable ? "Toca para retomar donde lo dejaste ▶" : "El tutor la está revisando ⏳"}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-2xl font-black text-amber-900">{baseTask ? baseTask.title : "Actividad Enviada"}</h4>
-                      <p className="text-amber-600 font-bold text-sm">
-                        {esReanudable ? "Toca para retomar donde lo dejaste ▶" : "El tutor la está revisando ⏳"}
-                      </p>
-                    </div>
+                    {esReanudable && (
+                      <div className="w-14 h-14 bg-amber-400 text-white rounded-full flex items-center justify-center shadow-md flex-shrink-0">
+                        <span className="text-xl">▶</span>
+                      </div>
+                    )}
                   </div>
-                  {esReanudable && (
-                    <div className="w-14 h-14 bg-amber-400 text-white rounded-full flex items-center justify-center shadow-md flex-shrink-0">
-                      <span className="text-xl">▶</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })}
 
-            {tareasCompletas.map((tarea: any) => {
-              const baseTask = dbTasksCache[tarea.modulo_id];
-              return (
-                <div
-                  key={tarea.id}
-                  className="bg-emerald-50/50 p-6 rounded-[2rem] border-4 border-emerald-100 opacity-70 flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 bg-emerald-400 rounded-2xl flex items-center justify-center text-white shadow-md">
-                      <CheckCircle2 size={32} />
+            {tareasCompletas
+              .filter(() => !onlyPending)
+              .map((tarea: any) => {
+                const baseTask = dbTasksCache[tarea.modulo_id];
+                return (
+                  <div
+                    key={tarea.id}
+                    className="bg-emerald-50/50 p-6 rounded-[2rem] border-4 border-emerald-100 opacity-70 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-6">
+                      <div className="w-16 h-16 bg-emerald-400 rounded-2xl flex items-center justify-center text-white shadow-md">
+                        <CheckCircle2 size={32} />
+                      </div>
+                      <div>
+                        <h4 className="text-2xl font-black text-emerald-900 line-through">{baseTask ? baseTask.title : "Rutina Terminada"}</h4>
+                        <p className="text-emerald-500 font-bold text-sm">¡Completado!</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-2xl font-black text-emerald-900 line-through">{baseTask ? baseTask.title : "Rutina Terminada"}</h4>
-                      <p className="text-emerald-500 font-bold text-sm">¡Completado!</p>
+                    <div className="w-14 h-14 bg-emerald-400 text-white rounded-full flex items-center justify-center shadow-inner">
+                      <CheckCircle2 size={24} />
                     </div>
                   </div>
-                  <div className="w-14 h-14 bg-emerald-400 text-white rounded-full flex items-center justify-center shadow-inner">
-                    <CheckCircle2 size={24} />
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         )}
       </div>

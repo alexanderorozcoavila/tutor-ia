@@ -44,6 +44,7 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
   const [menuItems, setMenuItems] = React.useState<MenuAccion[]>([]);
   const [executingId, setExecutingId] = React.useState<string | null>(null);
   const [confirmingId, setConfirmingId] = React.useState<string | null>(null);
+  const [onlyPending, setOnlyPending] = React.useState(false);
 
   React.useEffect(() => {
     if (user?.role) {
@@ -168,7 +169,19 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
 
           {/* Misiones de Hoy */}
           <div>
-            <h3 className={styles.sectionTitle}>Misiones del Día</h3>
+            <div className="flex items-center justify-between border-b-4 border-[var(--mc-brown-light)] mb-4 pb-2">
+              <h3 className={styles.sectionTitle} style={{ borderBottom: "none", margin: 0, padding: 0 }}>Misiones del Día</h3>
+              <label className={styles.mcCheckboxWrapper}>
+                <input 
+                  type="checkbox" 
+                  checked={onlyPending} 
+                  onChange={(e) => setOnlyPending(e.target.checked)} 
+                  className={styles.mcCheckboxHidden}
+                />
+                <span className={`${styles.mcCheckboxCustom} ${onlyPending ? styles.mcCheckboxChecked : ""}`}></span>
+                <span className={styles.mcCheckboxLabel}>SOLO PENDIENTES</span>
+              </label>
+            </div>
             <div className={styles.horizontalGrid}>
               
               {/* Pendientes */}
@@ -183,7 +196,7 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
               ))}
 
               {/* En Revisión / Reanudables */}
-              {tareasEnRevision.map((tarea: any) => {
+              {!onlyPending && tareasEnRevision.map((tarea: any) => {
                 const esReanudable = tarea.tipo_modulo === "dictation" || tarea.tipo_modulo === "reading";
                 return (
                   <div key={tarea.id} className={`${styles.taskCard} ${styles.taskBlock_urgent}`} onClick={() => esReanudable && handleCardClick(tarea)}>
@@ -199,7 +212,7 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
               })}
 
               {/* Completadas */}
-              {tareasCompletas.map((tarea: any) => (
+              {!onlyPending && tareasCompletas.map((tarea: any) => (
                 <div key={tarea.id} className={`${styles.taskCard} ${styles.taskBlock_completed}`}>
                   <div className={styles.cardIconBox} style={{ background: "#1a3a0d" }}><CheckCircle2 size={24} className="text-emerald-600" /></div>
                   <div className={styles.cardContent}>
@@ -216,18 +229,20 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
             <div>
               <h3 className={styles.sectionTitle}>Retos de la Semana</h3>
               <div className={styles.horizontalGrid}>
-                {evaluacionesSemanales.map((evalu: any) => {
-                  const done = evalu.estado === "completada";
-                  return (
-                    <div key={evalu.id} className={styles.taskCard} style={{ background: "var(--mc-purple)", borderColor: "var(--mc-purple-light)" }} onClick={() => !done && handleCardClick(evalu)}>
-                      <div className={styles.cardIconBox} style={{ background: "#2a0d3a" }}><ClipboardSignature size={24} className="text-purple-300" /></div>
-                      <div className={styles.cardContent}>
-                        <p className={styles.cardTitle} style={{ color: "#d2b8e3" }}>{done ? "Reto Superado" : "Evaluación"}</p>
-                        <p className={styles.cardMeta}>{done ? "¡Excelente trabajo!" : `Gana +${evalu.puntos_valor} XP extras`}</p>
+                {evaluacionesSemanales
+                  .filter((evalu: any) => !onlyPending || evalu.estado !== "completada")
+                  .map((evalu: any) => {
+                    const done = evalu.estado === "completada";
+                    return (
+                      <div key={evalu.id} className={styles.taskCard} style={{ background: "var(--mc-purple)", borderColor: "var(--mc-purple-light)" }} onClick={() => !done && handleCardClick(evalu)}>
+                        <div className={styles.cardIconBox} style={{ background: "#2a0d3a" }}><ClipboardSignature size={24} className="text-purple-300" /></div>
+                        <div className={styles.cardContent}>
+                          <p className={styles.cardTitle} style={{ color: "#d2b8e3" }}>{done ? "Reto Superado" : "Evaluación"}</p>
+                          <p className={styles.cardMeta}>{done ? "¡Excelente trabajo!" : `Gana +${evalu.puntos_valor} XP extras`}</p>
+                        </div>
+                        {done && <CheckCircle2 size={24} className="text-purple-400" />}
                       </div>
-                      {done && <CheckCircle2 size={24} className="text-purple-400" />}
-                    </div>
-                  );
+                    );
                 })}
               </div>
             </div>
