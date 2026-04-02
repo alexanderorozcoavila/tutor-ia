@@ -6,6 +6,7 @@ import { planService } from "@/lib/planService";
 import { useAlert } from "@/lib/AlertContext";
 import { Clock, CheckCircle2, XCircle, ArrowRight, Save, Star, AlertTriangle, ClipboardSignature } from "lucide-react";
 import confetti from "canvas-confetti";
+import { MinecraftCongrats } from "@/components/MinecraftCongrats";
 
 interface Props {
   task: Task;
@@ -241,29 +242,36 @@ export function AssessmentModule({ task, onFinish, theme }: Props) {
 
       {mode === "RESULTS" && (
         <div className="space-y-6">
-          <div className={`rounded-[3rem] p-12 text-center border-4 relative overflow-hidden ${isMinecraft ? "bg-[#3b2300] border-[#8B5A00] text-white" : "bg-white border-emerald-50 shadow-2xl"}`}>
-            <div className={`flex justify-center mb-4 ${isMinecraft ? "text-yellow-400" : "text-emerald-500"}`}>
-              <Star fill="currentColor" size={64} />
-            </div>
-            <h1 className={`text-4xl font-black mb-2 ${isMinecraft ? "text-white font-pixel" : "text-gray-900"}`}>{isMinecraft ? "MISIÓN FINALIZADA" : "Evaluación Finalizada"}</h1>
-            <p className={`font-bold mb-8 ${isMinecraft ? "text-green-400" : "text-gray-500"}`}>¡El tutor revisará tus resultados!</p>
-            
-            <div className={`inline-block border-4 rounded-[2rem] p-8 mb-8 ${isMinecraft ? "bg-[#4a2c00] border-[#8B5A00]" : "bg-emerald-50 border-emerald-100"}`}>
-               <div className={`text-sm font-black uppercase tracking-widest mb-2 ${isMinecraft ? "text-yellow-400" : "text-emerald-600"}`}>Nota Final</div>
-               <div className={`text-7xl font-black ${isMinecraft ? "text-white" : "text-emerald-600"}`}>{finalScore.toFixed(1)}</div>
-            </div>
+          {isMinecraft ? (
+            <MinecraftCongrats 
+              title="¡EVALUACIÓN COMPLETADA!"
+              subtitle={`Has obtenido una nota de ${finalScore.toFixed(1)}. ¡Qué buen trabajo!`}
+              xpGained={Math.round(finalScore * 10)}
+              onFinish={onFinish}
+              buttonText="TERMINAR MISIÓN"
+            />
+          ) : (
+            <div className="bg-white rounded-[3rem] p-12 text-center shadow-2xl border-4 border-emerald-50 relative overflow-hidden">
+               {/* existing card content... but wait I actually want to keep the review section visible if they want */}
+               <div className="text-emerald-500 flex justify-center mb-4">
+                 <Star fill="currentColor" size={64} />
+               </div>
+               <h1 className="text-4xl font-black text-gray-900 mb-2">Evaluación Finalizada</h1>
+               <p className="text-gray-500 font-bold mb-8">¡El tutor revisará tus resultados!</p>
+               
+               <div className="inline-block bg-emerald-50 border-4 border-emerald-100 rounded-[2rem] p-8 mb-8">
+                  <div className="text-sm font-black text-emerald-600 uppercase tracking-widest mb-2">Nota Final</div>
+                  <div className="text-7xl font-black text-emerald-600">{finalScore.toFixed(1)}</div>
+               </div>
 
-            <button 
-              onClick={onFinish}
-              className={`w-full md:w-auto px-16 py-6 rounded-full font-black text-2xl shadow-xl active:scale-95 transition-all ${
-                isMinecraft 
-                ? "bg-[#2d5a1b] border-4 border-[#1a3a0d] text-yellow-400 font-pixel text-lg" 
-                : "bg-emerald-500 hover:bg-emerald-600 text-white"
-              }`}
-            >
-              {isMinecraft ? "VOLVER AL ESCRITORIO" : "Volver al Menú"}
-            </button>
-          </div>
+               <button 
+                 onClick={onFinish}
+                 className="w-full md:w-auto px-16 py-6 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-black text-2xl shadow-xl active:scale-95 transition-all"
+               >
+                 Volver al Menú
+               </button>
+            </div>
+          )}
 
           {/* Justificaciones / Review para el niño */}
           <div className="space-y-4">

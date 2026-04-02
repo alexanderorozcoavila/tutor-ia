@@ -7,6 +7,7 @@ import { taskService } from "@/lib/taskService";
 import { settingsService } from "@/lib/settingsService";
 import { ImageCapture } from "@/components/ImageCapture";
 import { PhraseToast } from "@/components/PhraseToast";
+import { MinecraftCongrats } from "@/components/MinecraftCongrats";
 import {
   Loader2,
   CheckCircle2, Timer, RefreshCcw, Settings,
@@ -784,40 +785,48 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish, 
     );
   }
 
-  return (
-    <div className="flex flex-col items-center justify-center p-12 text-center h-[70vh] gap-8">
-      <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center text-green-500 border-4 border-green-200">
-        <CheckCircle2 size={64} />
+  if (step === "FINISHED") {
+    if (isMinecraft) {
+      return (
+        <MinecraftCongrats 
+          title="¡DICTADO COMPLETADO!"
+          subtitle={evaluationFeedback?.message || "Has terminado las palabras mágicas."}
+          xpGained={30}
+          onFinish={() => onFinish ? onFinish() : setStep("CONFIG")}
+        />
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center p-12 text-center h-[70vh] gap-8">
+        <div className="w-32 h-32 bg-green-100 rounded-full flex items-center justify-center text-green-500 border-4 border-green-200">
+          <CheckCircle2 size={64} />
+        </div>
+        <div className="max-w-2xl">
+          <h1 className="text-5xl font-black text-gray-900 mb-4">
+            ¡Felicitaciones!
+          </h1>
+          <p className="text-2xl text-gray-600">
+            Has terminado todo el dictado. El tutor va a revisarlo muy pronto. ¡Qué buen trabajo!
+          </p>
+        </div>
+        <div className="flex gap-4">
+          <button
+            onClick={() => {
+              if (onFinish) {
+                onFinish();
+              } else {
+                setStep("CONFIG");
+                setEvaluationFeedback(null);
+              }
+            }}
+            className="px-12 py-5 bg-blue-500 text-white rounded-full font-extrabold text-2xl shadow-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-2"
+          >
+            <RefreshCcw /> {onFinish ? "Volver a Tareas" : "Otro Dictado"}
+          </button>
+        </div>
       </div>
-      <div className="max-w-2xl">
-        <h1 className="text-5xl font-black text-gray-900 mb-4">
-          ¡Felicitaciones!
-        </h1>
-        <p className="text-2xl text-gray-600">
-          Has terminado todo el dictado. El tutor va a revisarlo muy pronto. ¡Qué buen trabajo!
-        </p>
-      </div>
-      <div className="flex gap-4">
-        <button
-          onClick={() => {
-            if (onFinish) {
-              onFinish();
-            } else {
-              setStep("CONFIG");
-              setEvaluationFeedback(null);
-            }
-          }}
-          className="px-12 py-5 bg-blue-500 text-white rounded-full font-extrabold text-2xl shadow-xl hover:bg-blue-600 transition-all active:scale-95 flex items-center gap-2"
-        >
-          <RefreshCcw /> {onFinish ? "Volver a Tareas" : "Otro Dictado"}
-        </button>
-        <button
-          onClick={() => window.location.href = "/"}
-          className="px-12 py-5 bg-gray-200 text-gray-700 rounded-full font-extrabold text-2xl shadow-md hover:bg-gray-300 transition-all active:scale-95"
-        >
-          Ir al Inicio
-        </button>
-      </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }

@@ -14,6 +14,7 @@ import { useDeviceDetect } from "@/hooks/useDeviceDetect";
 import { planService, PlanSemanal, evalEstadoLMS } from "@/lib/planService";
 import { StudentPlanViewer } from "./StudentPlanViewer";
 import { MinecraftStudentViewer } from "./MinecraftStudentViewer";
+import { MinecraftLoader } from "./MinecraftLoader";
 
 interface Props {
   onStartTask: (task: Task) => void;
@@ -111,6 +112,13 @@ export function TaskDashboard({ onStartTask }: Props) {
   };
 
   if (isLoading) {
+    if (user?.theme?.slug === "minecraft") {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[60vh] w-full">
+          <MinecraftLoader />
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center h-64 gap-4">
         <Loader2 className="text-indigo-500 animate-spin" size={48} />

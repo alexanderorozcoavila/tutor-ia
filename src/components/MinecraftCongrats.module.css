@@ -1,0 +1,147 @@
+.congratsOverlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  padding: 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.congratsCard {
+  background: #3b2300;
+  border: 8px solid #8B5A00;
+  border-right-color: #4a2c00;
+  border-bottom-color: #4a2c00;
+  padding: 4rem;
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  image-rendering: pixelated;
+  position: relative;
+  overflow: hidden;
+}
+
+.rewardIconArea {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+  z-index: 2;
+}
+
+.diamondItem {
+  background: #4a2c00;
+  border: 6px solid #55FFFF;
+  width: 100px;
+  height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  image-rendering: pixelated;
+  animation: floatDiamond 3s infinite ease-in-out;
+  box-shadow: 0 0 30px rgba(85, 255, 255, 0.3);
+}
+
+@keyframes floatDiamond {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+.glowIcon {
+  filter: drop-shadow(0 0 10px #55FFFF);
+}
+
+.sparkle1, .sparkle2 {
+  position: absolute;
+  color: #FFFF55;
+  animation: twinkle 1s infinite alternate;
+}
+
+.sparkle1 { top: 0; left: 0; }
+.sparkle2 { bottom: 0; right: 0; animation-delay: 0.5s; }
+
+@keyframes twinkle {
+  from { opacity: 0.3; transform: scale(0.8) rotate(0deg); }
+  to { opacity: 1; transform: scale(1.2) rotate(45deg); }
+}
+
+.congratsTitle {
+  font-family: var(--font-pixel), sans-serif;
+  font-size: 28px;
+  color: #FFFF55;
+  text-shadow: 4px 4px #000;
+  margin-bottom: 1.5rem;
+  letter-spacing: 2px;
+}
+
+.congratsSubtitle {
+  font-family: var(--font-vt323), monospace;
+  font-size: 24px;
+  color: #DDD;
+  margin-bottom: 2.5rem;
+  line-height: 1.2;
+}
+
+.xpBadge {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.75rem 2rem;
+  border: 2px dashed #FFFF55;
+  color: #AAFFAA;
+  font-family: var(--font-pixel), sans-serif;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 3rem;
+}
+
+.mcBtn {
+  position: relative;
+  z-index: 10;
+  font-family: var(--font-pixel), monospace;
+  font-size: 12px;
+  padding: 1.5rem 3rem;
+  border: 6px solid;
+  cursor: pointer;
+  background: #2d5a1b;
+  border-color: #4a8a2a #1a3a0d #1a3a0d #4a8a2a;
+  color: #FFFF55;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  transition: all 0.1s;
+  text-shadow: 2px 2px #1a3a0d;
+}
+
+.mcBtn:active {
+  transform: translateY(4px);
+  border-color: #1a3a0d #4a8a2a #4a8a2a #1a3a0d;
+  background: #1a3a0d;
+}
+
+.sunburst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  aspect-ratio: 1;
+  background: radial-gradient(circle, rgba(255, 255, 85, 0.1) 0%, transparent 70%);
+  transform: translate(-50%, -50%);
+  opacity: 0.4;
+  z-index: 1;
+  animation: spinBurst 10s infinite linear;
+}
+
+@keyframes spinBurst {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}

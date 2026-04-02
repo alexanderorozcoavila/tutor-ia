@@ -8,6 +8,7 @@ import { ProgressBar } from "@/components/ProgressBar";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAlert } from "@/lib/AlertContext";
 import { Loader2, Mic, Volume2, Star, CheckCircle2, BookOpen } from "lucide-react";
+import { MinecraftCongrats } from "@/components/MinecraftCongrats";
 
 interface Props {
   task: Task;
@@ -204,42 +205,59 @@ export function ReadingModule({ task, onFinish, theme }: Props) {
           )}
 
           {state === "FEEDBACK" && (
-            <div className="flex flex-col items-center gap-4 md:gap-8 w-full animate-in slide-in-from-bottom-4 duration-500">
-              <div className="flex items-center gap-4 md:gap-6 bg-emerald-50 w-full p-4 md:p-8 rounded-[2rem] border-4 border-emerald-200 shadow-xl max-h-[160px] overflow-y-auto">
-                <div className="p-3 bg-white rounded-2xl shadow-sm relative shrink-0 hidden md:block">
-                  <Volume2 size={32} className="text-emerald-500 animate-pulse" />
-                  {score >= 80 && <Star size={20} className="text-yellow-400 absolute -top-3 -right-3 fill-yellow-400 animate-bounce" />}
-                </div>
-                <div className="w-full">
-                  <p className="text-lg md:text-3xl font-black text-gray-800 leading-tight md:leading-tight mb-2">
-                    {feedback}
-                  </p>
-                  <div className="flex items-center gap-2">
-                     <div className="flex-1 h-2 md:h-3 bg-gray-200 rounded-full overflow-hidden">
-                       <div className="h-full bg-emerald-500" style={{ width: `${score}%` }} />
-                     </div>
-                     <span className="text-emerald-600 font-black text-xs md:text-sm">{score}%</span>
+            isMinecraft && score >= 80 ? (
+              <MinecraftCongrats 
+                title="¡LECTURA MAGNÍFICA!"
+                subtitle={feedback}
+                xpGained={25}
+                onFinish={onFinish}
+              />
+            ) : (
+              <div className="flex flex-col items-center gap-4 md:gap-8 w-full animate-in slide-in-from-bottom-4 duration-500">
+                <div className={`${isMinecraft ? "bg-[#4a2c00] border-[#8B5A00]" : "bg-emerald-50 border-emerald-200 shadow-xl"} flex items-center gap-4 md:gap-6 w-full p-4 md:p-8 rounded-[2rem] border-4 max-h-[160px] overflow-y-auto`}>
+                  <div className={`p-3 rounded-2xl shadow-sm relative shrink-0 hidden md:block ${isMinecraft ? "bg-[#3b2300]" : "bg-white"}`}>
+                    <Volume2 size={32} className={`${isMinecraft ? "text-yellow-400" : "text-emerald-500"} animate-pulse`} />
+                    {score >= 80 && <Star size={20} className="text-yellow-400 absolute -top-3 -right-3 fill-yellow-400 animate-bounce" />}
+                  </div>
+                  <div className="w-full">
+                    <p className={`text-lg md:text-3xl font-black leading-tight md:leading-tight mb-2 ${isMinecraft ? "text-white" : "text-gray-800"}`}>
+                      {feedback}
+                    </p>
+                    <div className="flex items-center gap-2">
+                       <div className="flex-1 h-2 md:h-3 bg-gray-600 rounded-full overflow-hidden">
+                         <div className={isMinecraft ? "h-full bg-yellow-400" : "h-full bg-emerald-500"} style={{ width: `${score}%` }} />
+                       </div>
+                       <span className={`font-black text-xs md:text-sm ${isMinecraft ? "text-yellow-400" : "text-emerald-600"}`}>{score}%</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="flex flex-row md:gap-4 gap-2 w-full justify-center mt-2 shrink-0">
-                {score < 80 && (
+                
+                <div className="flex flex-row md:gap-4 gap-2 w-full justify-center mt-2 shrink-0">
+                  {score < 80 && (
+                    <button
+                      onClick={() => setState("WAITING_PRESS")}
+                      className={`flex-1 max-w-[160px] py-3 md:px-8 md:py-5 font-black text-sm md:text-xl rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 ${
+                        isMinecraft 
+                        ? "bg-[#3b2300] text-white border-2 border-[#8B5A00]" 
+                        : "bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200"
+                      }`}
+                    >
+                      Reintentar
+                    </button>
+                  )}
                   <button
-                    onClick={() => setState("WAITING_PRESS")}
-                    className="flex-1 max-w-[160px] py-3 md:px-8 md:py-5 font-black text-sm md:text-xl rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 bg-white text-gray-600 hover:bg-gray-50 border-2 border-gray-200"
+                    onClick={onFinish}
+                    className={`flex-1 max-w-[200px] py-3 md:px-10 md:py-5 font-black text-base md:text-2xl rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-2 ${
+                      isMinecraft 
+                      ? "bg-[#2d5a1b] border-2 border-[#4a8a2a] text-yellow-400 font-pixel text-sm" 
+                      : "bg-amber-500 text-white hover:bg-amber-600"
+                    }`}
                   >
-                    Reintentar
+                    Siguiente ➡️
                   </button>
-                )}
-                <button
-                  onClick={onFinish}
-                  className="flex-1 max-w-[200px] py-3 md:px-10 md:py-5 font-black text-base md:text-2xl rounded-full shadow-lg transition-all hover:scale-105 active:scale-95 bg-amber-500 text-white hover:bg-amber-600 flex items-center justify-center gap-2"
-                >
-                  Siguiente ➡️
-                </button>
+                </div>
               </div>
-            </div>
+            )
           )}
 
           {state === "INSTRUCTING" && (
