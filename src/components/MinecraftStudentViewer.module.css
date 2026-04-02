@@ -1,0 +1,348 @@
+/* Minecraft Desktop Web Theme Layout */
+
+:root {
+  --mc-brown: #4a2c00;
+  --mc-brown-light: #8B5A00;
+  --mc-brown-dark: #3b2300;
+  --mc-green: #2d5a1b;
+  --mc-green-light: #4a8a2a;
+  --mc-green-dark: #1a3a0d;
+  --mc-xp-green: #55ff55;
+  --mc-xp-shadow: #88ff88;
+  --mc-yellow: #FFFF55;
+  --mc-purple: #4a1b5a;
+  --mc-purple-light: #6a2a8a;
+}
+
+.mcPageWrapper {
+  background-color: #1a1a2e;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: var(--font-vt323), monospace;
+  color: white;
+  overflow-x: hidden;
+}
+
+/* ── HEADER ────────────────────────────────────────── */
+.mcHeader {
+  background: var(--mc-brown);
+  border-bottom: 6px solid var(--mc-brown-light);
+  padding: 0 2rem;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  image-rendering: pixelated;
+}
+
+.headerLogoArea {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.mcLogo {
+  width: 48px;
+  height: 48px;
+  background: #ff4444; /* Gift icon placeholder if pixels fail */
+  display: grid;
+  grid-template-columns: repeat(4, 12px);
+  grid-template-rows: repeat(4, 12px);
+}
+
+.appTitle {
+  font-family: var(--font-pixel), monospace;
+  font-size: 16px;
+  color: var(--mc-yellow);
+  text-shadow: 3px 3px var(--mc-brown-dark);
+}
+
+.navLinks {
+  display: flex;
+  gap: 2rem;
+}
+
+.navLink {
+  font-family: var(--font-pixel), monospace;
+  font-size: 10px;
+  color: white;
+  text-decoration: none;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.navLink:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--mc-yellow);
+}
+
+.navLinkActive {
+  color: var(--mc-yellow);
+  border-bottom: 4px solid var(--mc-yellow);
+}
+
+.headerProfile {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.profileAvatar {
+  width: 44px;
+  height: 44px;
+  background: #555;
+  border: 3px solid white;
+}
+
+/* ── LAYOUT GRID ───────────────────────────────────── */
+.mainGrid {
+  max-width: 1400px;
+  margin: 3rem auto;
+  padding: 0 2rem;
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 3rem;
+  flex: 1;
+}
+
+@media (max-width: 1024px) {
+  .mainGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── PRIMARY COLUMN ────────────────────────────────── */
+.primaryColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+.planCard {
+  background: var(--mc-brown);
+  border: 5px solid var(--mc-brown-light);
+  border-right-color: var(--mc-brown-dark);
+  border-bottom-color: var(--mc-brown-dark);
+  padding: 2.5rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.skyTexture {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 100px;
+  background: linear-gradient(180deg, #5c94fc 0%, #7ec8e3 100%);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.goalInfo {
+  position: relative;
+  z-index: 2;
+  margin-bottom: 2rem;
+}
+
+.goalLabel {
+  font-family: var(--font-pixel), monospace;
+  font-size: 12px;
+  color: var(--mc-yellow);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.rewardDisplay {
+  font-size: 42px;
+  color: #aaffaa;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* XP Progress Bar */
+.xpSection {
+  margin-top: 1rem;
+}
+
+.xpHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.xpPoints {
+  font-family: var(--font-pixel), monospace;
+  font-size: 10px;
+  color: var(--mc-xp-green);
+}
+
+.xpBarContainer {
+  height: 32px;
+  background: #333;
+  border: 4px solid #555;
+  position: relative;
+}
+
+.xpBarFill {
+  height: 100%;
+  background: var(--mc-xp-green);
+  transition: width 0.8s ease-in-out;
+  position: relative;
+}
+
+.xpBarFill::after {
+  height: 10px;
+  background: var(--mc-xp-shadow);
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+}
+
+/* Cards & Grids */
+.sectionTitle {
+  font-family: var(--font-pixel), monospace;
+  font-size: 14px;
+  color: var(--mc-yellow);
+  text-shadow: 2px 2px var(--mc-brown-dark);
+  margin-bottom: 1.5rem;
+  border-bottom: 4px solid var(--mc-brown-light);
+  padding-bottom: 0.5rem;
+  display: inline-block;
+}
+
+.horizontalGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Enhanced Task Card */
+.taskCard {
+  background: var(--mc-green);
+  border: 4px solid var(--mc-green-light);
+  border-right-color: var(--mc-green-dark);
+  border-bottom-color: var(--mc-green-dark);
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  cursor: pointer;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+}
+
+.taskCard:hover {
+  transform: translateY(-8px);
+  border-color: #6abf3a;
+  box-shadow: 0 12px 0 rgba(0,0,0,0.4);
+}
+
+.cardIconBox {
+  width: 60px;
+  height: 60px;
+  background: var(--mc-green-dark);
+  border: 3px solid var(--mc-green-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cardContent {
+  flex: 1;
+}
+
+.cardTitle {
+  font-family: var(--font-pixel), monospace;
+  font-size: 11px;
+  color: var(--mc-yellow);
+  margin-bottom: 0.25rem;
+}
+
+.cardMeta {
+  color: #aaffaa;
+  font-size: 18px;
+}
+
+/* ── SIDEBAR ───────────────────────────────────────── */
+.sidebarPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.sidebarBox {
+  background: rgba(44, 44, 74, 0.9);
+  border: 4px solid #4444aa;
+  border-right-color: #1a1a2e;
+  border-bottom-color: #1a1a2e;
+  padding: 1.5rem;
+}
+
+.sidebarTitle {
+  font-family: var(--font-pixel), monospace;
+  font-size: 9px;
+  color: #8888cc;
+  margin-bottom: 1.25rem;
+  display: block;
+}
+
+.trophyRack {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem 0;
+  background: rgba(0,0,0,0.2);
+  border: 2px solid rgba(255,255,255,0.1);
+}
+
+.trophyItem {
+  transition: all 0.5s;
+  opacity: 0.2;
+  transform: scale(0.8);
+}
+
+.trophyActive {
+  opacity: 1;
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 8px #FFDD00);
+}
+
+.sidebarBtn {
+  width: 100%;
+  padding: 1rem;
+  font-family: var(--font-pixel), monospace;
+  font-size: 9px;
+  border: 4px solid;
+  cursor: pointer;
+  margin-top: 0.5rem;
+  text-align: center;
+}
+
+/* ── FOOTER ────────────────────────────────────────── */
+.mcFooter {
+  background: var(--mc-brown-dark);
+  border-top: 4px solid var(--mc-brown);
+  padding: 3rem 2rem;
+  margin-top: auto;
+  text-align: center;
+}
+
+.footerContent {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  opacity: 0.6;
+}
+
+.footerLogo {
+  font-family: var(--font-pixel), monospace;
+  font-size: 10px;
+  color: var(--mc-yellow);
+}

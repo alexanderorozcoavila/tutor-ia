@@ -79,30 +79,34 @@ function AppContent() {
     }
   };
 
-  return (
-    <div className="w-full min-h-screen flex flex-col bg-gray-50/50">
-      {/* Navbar Global - Solo visible si hay usuario */}
-      <header className="w-full bg-white/80 backdrop-blur-md border-b-2 border-indigo-50 px-8 py-4 flex justify-between items-center sticky top-0 z-[100] shadow-sm">
-        <div className="flex items-center gap-2 text-indigo-600 font-black text-2xl">
-          <Sparkles className="animate-pulse" size={28} /> IA Tutor
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col items-end mr-2 bg-indigo-50/50 px-4 py-1 rounded-2xl border border-indigo-100">
-            <span className="text-sm font-black text-indigo-900">{user.username}</span>
-            <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-tight">{user.role}</span>
-          </div>
-          <button 
-            onClick={logout}
-            className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-100 transition-all flex items-center gap-2 font-black text-sm shadow-sm active:scale-95"
-            title="Cerrar Sesión"
-          >
-            <LogOut size={18} /> <span className="hidden md:inline">Salir</span>
-          </button>
-        </div>
-      </header>
+  const isMinecraftStudent = user?.role === "student" && user?.theme?.slug === "minecraft";
 
-      <main className="flex-1 flex flex-col items-center p-4">
+  return (
+    <div className={isMinecraftStudent ? "w-full min-h-screen flex flex-col" : "w-full min-h-screen flex flex-col bg-gray-50/50"}>
+      {/* Navbar Global - Solo visible si hay usuario y NO es el tema minecraft de alumno */}
+      {!isMinecraftStudent && (
+        <header className="w-full bg-white/80 backdrop-blur-md border-b-2 border-indigo-50 px-8 py-4 flex justify-between items-center sticky top-0 z-[100] shadow-sm">
+          <div className="flex items-center gap-2 text-indigo-600 font-black text-2xl">
+            <Sparkles className="animate-pulse" size={28} /> IA Tutor
+          </div>
+          
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end mr-2 bg-indigo-50/50 px-4 py-1 rounded-2xl border border-indigo-100">
+              <span className="text-sm font-black text-indigo-900">{user.username}</span>
+              <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-tight">{user.role}</span>
+            </div>
+            <button 
+              onClick={logout}
+              className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-100 transition-all flex items-center gap-2 font-black text-sm shadow-sm active:scale-95"
+              title="Cerrar Sesión"
+            >
+              <LogOut size={18} /> <span className="hidden md:inline">Salir</span>
+            </button>
+          </div>
+        </header>
+      )}
+
+      <main className={isMinecraftStudent ? "flex-1 flex flex-col" : "flex-1 flex flex-col items-center p-4"}>
         {renderRolePanel()}
       </main>
     </div>

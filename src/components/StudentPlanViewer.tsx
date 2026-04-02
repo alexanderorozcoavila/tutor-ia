@@ -8,9 +8,8 @@ import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
 import { useAlert } from "@/lib/AlertContext";
 import { CheckCircle2, Star, Gift, Loader2, Sparkles, Clock, Trophy, Medal, ClipboardSignature, Zap, Lock } from "lucide-react";
-import confetti from "canvas-confetti";
 import parse from "html-react-parser";
-import { calcularNivelDiario } from "@/lib/actions/gamification";
+import { useStudentPlan } from "@/hooks/useStudentPlan";
 
 interface Props {
   plan: PlanSemanal;
@@ -142,213 +141,26 @@ function RewardCard({ rd, currentLevel, isActivated, isActivating, onActivar, ne
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Props) {
-  const { user } = useAuth();
-  const { showAlert } = useAlert();
-  const [tareasCompletas, setTareasCompletas] = useState<TareaPlanificada[]>([]);
-  const [tareasEnRevision, setTareasEnRevision] = useState<TareaPlanificada[]>([]);
-  const [tareasPendientes, setTareasPendientes] = useState<TareaPlanificada[]>([]);
-  const [evaluacionesSemanales, setEvaluacionesSemanales] = useState<TareaPlanificada[]>([]);
-  const [dbTasksCache, setDbTasksCache] = useState<Record<string, Task>>({});
-  const [dailyLevel, setDailyLevel] = useState<number>(0);
-  const [isSyncingGamification, setIsSyncingGamification] = useState(false);
+  const {
+    tareasCompletas,
+    tareasEnRevision,
+    tareasPendientes,
+    evaluacionesSemanales,
+    dbTasksCache,
+    dailyLevel,
+    isSyncingGamification,
+    recompensasDelDia,
+    activatingRecompensaId,
+    activatedRecompensas,
+    newlyUnlockedNivel,
+    optimisticPoints,
+    progressPercent,
+    hasRecompensasHoy,
+    handleActivarRecompensa,
+    handleCardClick,
+  } = useStudentPlan(plan, onStartModule);
 
-  // Recompensas del día
-  const [recompensasDelDia, setRecompensasDelDia] = useState<(RecompensaDiaria & { recompensa?: Recompensa })[]>([]);
-  const [activatingRecompensaId, setActivatingRecompensaId] = useState<string | null>(null);
-  const [activatedRecompensas, setActivatedRecompensas] = useState<Set<string>>(new Set());
-  const [newlyUnlockedNivel, setNewlyUnlockedNivel] = useState<number>(0); // nivel recién desbloqueado para animación
 
-  // Puntos optimistas
-  const realPoints = (plan.tareas || [])
-    .filter(t => t.estado === "completada")
-    .reduce((acc, t) => acc + t.puntos_valor, 0);
-
-  const [optimisticPoints, addOptimisticPoints] = useOptimistic(
-    realPoints,
-    (state, newPoints: number) => state + newPoints
-  );
-
-  const loadData = useCallback(async () => {
-    if (!plan.tareas) return;
-
-    const today = new Date().getDay();
-
-    const todaysPlanTasks = plan.tareas
-      .filter(t => t.dia_semana === today)
-      .sort((a, b) => a.orden_visual - b.orden_visual);
-
-    setTareasCompletas(todaysPlanTasks.filter(t => t.estado === "completada"));
-    setTareasEnRevision(todaysPlanTasks.filter(t => t.estado === "en_revision"));
-    setTareasPendientes(todaysPlanTasks.filter(t => t.estado === "pendiente"));
-
-    const weekEvaluations = plan.tareas
-      .filter(t => t.tipo_modulo === "assessment")
-      .sort((a, b) => (a.orden_visual || 0) - (b.orden_visual || 0));
-    setEvaluacionesSemanales(weekEvaluations);
-
-    const allModuleIds = [...new Set([...todaysPlanTasks, ...weekEvaluations].map(t => t.modulo_id))];
-    if (allModuleIds.length > 0) {
-      try {
-        const rawTasks = await taskService.getTasks();
-        const map: Record<string, Task> = {};
-        rawTasks.forEach(t => (map[t.id] = t));
-        setDbTasksCache(map);
-      } catch (e) {
-        console.error("Error loading db tasks:", e);
-      }
-    }
-
-    // Historial de nivel diario
-    try {
-      const historial = await planService.getHistorialDiarioDia(plan.id, today);
-      let currentLevel = 0;
-      if (historial) {
-        currentLevel = historial.nivel_alcanzado;
-        setDailyLevel(currentLevel);
-      }
-
-      // Auto-sanación
-      const totalHoy = todaysPlanTasks.reduce((acc, t) => acc + t.puntos_valor, 0);
-      const completosHoy = todaysPlanTasks.filter(t => t.estado === "completada").reduce((acc, t) => acc + t.puntos_valor, 0);
-      if (totalHoy > 0 && completosHoy === totalHoy && currentLevel < 3 && user) {
-        const res = await calcularNivelDiario(plan.id, today, user.id);
-        if (res) setDailyLevel(res.nivel);
-      }
-    } catch (e) {
-      console.error("Error loading daily history:", e);
-    }
-
-    // Recompensas del día
-    try {
-      const rds = await rewardService.getRecompensasDiarias(plan.id);
-      const hoyRDs = rds.filter(rd => rd.dia_semana === today);
-      setRecompensasDelDia(hoyRDs as any);
-
-      // Cargar usos ya existentes desde BD → evita re-activación tras recarga de página
-      if (user && hoyRDs.length > 0) {
-        const rdIds = hoyRDs.map(rd => rd.id);
-        const usadas = await rewardService.getUsosRecompensaHoy(rdIds, user.id);
-        setActivatedRecompensas(new Set(usadas));
-      }
-    } catch (e) {
-      console.error("Error loading recompensas:", e);
-    }
-  }, [plan.id, plan.tareas, user]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const handleEstadoOptimistic = async (tarea: TareaPlanificada, newState: "completada" | "en_revision") => {
-    startTransition(() => {
-      setTareasPendientes(prev => prev.filter(t => t.id !== tarea.id));
-      if (newState === "completada") {
-        addOptimisticPoints(tarea.puntos_valor);
-        setTareasCompletas(prev => [...prev, { ...tarea, estado: "completada" }]);
-      } else {
-        setTareasEnRevision(prev => [...prev, { ...tarea, estado: "en_revision" }]);
-      }
-    });
-
-    try {
-      await planService.updateEstadoTareaPlanificada(tarea.id, newState);
-
-      const today = new Date().getDay();
-      if (user) {
-        setIsSyncingGamification(true);
-        const result = await calcularNivelDiario(plan.id, today, user.id);
-        if (result && result.nivel > dailyLevel) {
-          const newNivel = result.nivel;
-          setDailyLevel(newNivel);
-          setNewlyUnlockedNivel(newNivel);
-
-          confetti({
-            particleCount: newNivel * 60,
-            spread: 70,
-            origin: { y: 0.8 },
-            colors: newNivel === 3 ? ["#fbbf24", "#f59e0b", "#10b981", "#ffffff"] : ["#34d399", "#60a5fa", "#a78bfa"],
-          });
-
-          // Quitar la animación de "recién desbloqueado" después de 4 segundos
-          setTimeout(() => setNewlyUnlockedNivel(0), 4000);
-        }
-        setIsSyncingGamification(false);
-      }
-
-      if (newState === "completada") {
-        const isAchieved = await planService.checkRewardUnlock(plan.id);
-        if (isAchieved && !plan.esta_lograda) {
-          confetti({
-            particleCount: 200,
-            spread: 90,
-            origin: { y: 0.6 },
-            colors: ["#34d399", "#fbbf24", "#f87171", "#60a5fa", "#a855f7"],
-          });
-        }
-      }
-    } catch (err: any) {
-      console.error("Error cambiando estado:", err);
-      showAlert(err.message || "Error al actualizar", { type: "error" });
-      loadData();
-    }
-  };
-
-  const handleActivarRecompensa = async (rd: RecompensaDiaria & { recompensa?: Recompensa }) => {
-    if (!user || activatingRecompensaId) return;
-    const rInfo = (rd as any).recompensa as Recompensa | undefined;
-    setActivatingRecompensaId(rd.id);
-    try {
-      await rewardService.activarRecompensa(rd.id, user.id);
-      setActivatedRecompensas(prev => new Set([...prev, rd.id]));
-      confetti({ particleCount: 100, spread: 55, origin: { y: 0.75 } });
-      showAlert(`¡${rInfo?.nombre || "Recompensa"} activada! La app se abrirá en breve. 🚀`, { type: "success" });
-    } catch (err: any) {
-      showAlert(err.message || "Error al activar la recompensa", { type: "error" });
-    } finally {
-      setActivatingRecompensaId(null);
-    }
-  };
-
-  const handleCardClick = async (tarea: TareaPlanificada) => {
-    if (tarea.tipo_modulo === "domestic") {
-      handleEstadoOptimistic(tarea, "completada");
-    } else if (tarea.tipo_modulo === "assessment") {
-      try {
-        const { data: template } = await supabase.from("assessment_templates").select("*").eq("id", tarea.modulo_id).single();
-        if (template) {
-          const virtualTask: Task = {
-            id: tarea.id,
-            title: template.title,
-            type: "assessment",
-            status: "pending",
-            score: 0,
-            created_at: new Date().toISOString(),
-            metadata: {
-              questions: template.questions,
-              assessment_time_limit: template.time_limit_seconds,
-              template_id: template.id,
-              is_plan_task: true,
-            },
-          };
-          onStartModule(virtualTask);
-        }
-      } catch (e) {
-        showAlert("No se pudo cargar la evaluación.", { type: "error" });
-      }
-    } else {
-      const baseTask = dbTasksCache[tarea.modulo_id];
-      if (baseTask) {
-        // Si ya estaba en_revision (alumno salió a la mitad), retomar sin cambiar estado nuevamente
-        if (tarea.estado !== "en_revision") {
-          handleEstadoOptimistic(tarea, "en_revision");
-        }
-        onStartModule(baseTask);
-      }
-    }
-  };
-
-  const progressPercent = Math.min(100, Math.round((optimisticPoints / plan.meta_puntos_total) * 100));
-  const hasRecompensasHoy = recompensasDelDia.some(rd => rd.recompensa_id);
 
   return (
     <div className="w-full max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500 pb-12">
@@ -422,7 +234,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
             )}
             {dailyLevel > 0 && (
               <span className="text-xs font-black text-amber-600 bg-amber-100 px-3 py-1 rounded-full animate-pulse">
-                ¡{recompensasDelDia.filter(rd => dailyLevel >= rd.nivel_requerido && rd.recompensa_id).length} desbloqueadas!
+                ¡{recompensasDelDia.filter((rd: any) => dailyLevel >= rd.nivel_requerido && rd.recompensa_id).length} desbloqueadas!
               </span>
             )}
           </div>
@@ -430,9 +242,9 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
           {/* Tarjetas de recompensa por nivel */}
           <div className="grid grid-cols-1 gap-4">
             {recompensasDelDia
-              .filter(rd => rd.recompensa_id) // solo las asignadas
-              .sort((a, b) => a.nivel_requerido - b.nivel_requerido)
-              .map(rd => (
+              .filter((rd: any) => rd.recompensa_id) // solo las asignadas
+              .sort((a: any, b: any) => a.nivel_requerido - b.nivel_requerido)
+              .map((rd: any) => (
                 <RewardCard
                   key={rd.id}
                   rd={rd}
@@ -448,8 +260,8 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
           {/* Barra de progreso hacia siguiente recompensa */}
           {dailyLevel < 3 && (() => {
             const nextReward = recompensasDelDia
-              .filter(rd => rd.recompensa_id && rd.nivel_requerido > dailyLevel)
-              .sort((a, b) => a.nivel_requerido - b.nivel_requerido)[0];
+              .filter((rd: any) => rd.recompensa_id && rd.nivel_requerido > dailyLevel)
+              .sort((a: any, b: any) => a.nivel_requerido - b.nivel_requerido)[0];
             if (!nextReward) return null;
             const cfg = NIVEL_CONFIG.find(n => n.nivel === nextReward.nivel_requerido);
             const target = nextReward.nivel_requerido === 1 ? 0.8 : nextReward.nivel_requerido === 2 ? 0.9 : 1.0;
@@ -478,7 +290,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
         <div className="space-y-4">
           <h3 className="text-xl font-black text-purple-400 uppercase tracking-widest pl-4">Retos de la Semana</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {evaluacionesSemanales.map(evalu => {
+            {evaluacionesSemanales.map((evalu: any) => {
               const isCompletada = evalu.estado === "completada";
               return (
                 <div
@@ -519,7 +331,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
-            {tareasPendientes.map(tarea => {
+            {tareasPendientes.map((tarea: any) => {
               const baseTask = dbTasksCache[tarea.modulo_id];
               return (
                 <div
@@ -541,7 +353,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
               );
             })}
 
-            {tareasEnRevision.map(tarea => {
+            {tareasEnRevision.map((tarea: any) => {
               const baseTask = dbTasksCache[tarea.modulo_id];
               const esReanudable = tarea.tipo_modulo === "dictation" || tarea.tipo_modulo === "reading";
               return (
@@ -571,7 +383,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
               );
             })}
 
-            {tareasCompletas.map(tarea => {
+            {tareasCompletas.map((tarea: any) => {
               const baseTask = dbTasksCache[tarea.modulo_id];
               return (
                 <div

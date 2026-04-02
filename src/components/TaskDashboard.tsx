@@ -13,6 +13,7 @@ import {
 import { useDeviceDetect } from "@/hooks/useDeviceDetect";
 import { planService, PlanSemanal, evalEstadoLMS } from "@/lib/planService";
 import { StudentPlanViewer } from "./StudentPlanViewer";
+import { MinecraftStudentViewer } from "./MinecraftStudentViewer";
 
 interface Props {
   onStartTask: (task: Task) => void;
@@ -118,11 +119,33 @@ export function TaskDashboard({ onStartTask }: Props) {
     );
   }
 
+  const isMinecraft = user?.theme?.slug === "minecraft";
+
   // BIFURCACIÓN LÓGICA (Modo Plan vs Modo Libre)
   if (activePlan) {
+    if (isMinecraft) {
+      return (
+        <MinecraftStudentViewer
+          plan={activePlan}
+          onRefreshFallback={() => loadTasks()}
+          onStartModule={onStartTask}
+        />
+      );
+    }
+    
     return (
       <StudentPlanViewer 
         plan={activePlan}
+        onRefreshFallback={() => loadTasks()}
+        onStartModule={onStartTask}
+      />
+    );
+  }
+
+  if (isMinecraft) {
+    return (
+      <MinecraftStudentViewer
+        plan={null as any} // Handle null plan in the component
         onRefreshFallback={() => loadTasks()}
         onStartModule={onStartTask}
       />

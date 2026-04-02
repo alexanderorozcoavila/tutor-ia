@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Comic_Neue, Press_Start_2P, Bangers } from "next/font/google";
+import { Comic_Neue, Press_Start_2P, Bangers, VT323 } from "next/font/google";
 import "./globals.css";
 
 const comicNeue = Comic_Neue({
@@ -20,6 +20,12 @@ const comicFont = Bangers({
   variable: "--font-comic",
 });
 
+const vt323 = VT323({
+  weight: ["400"],
+  subsets: ["latin"],
+  variable: "--font-vt323",
+});
+
 import { AlertProvider } from "@/lib/AlertContext";
 import { AuthProvider } from "@/lib/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -37,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className={`${comicNeue.variable} ${pixelFont.variable} ${comicFont.variable} h-full antialiased`}>
+    <html lang="es" className={`${comicNeue.variable} ${pixelFont.variable} ${comicFont.variable} ${vt323.variable} h-full antialiased`}>
       <body className="font-sans min-h-full flex flex-col bg-slate-50">
         <AlertProvider>
           <AuthProvider>
