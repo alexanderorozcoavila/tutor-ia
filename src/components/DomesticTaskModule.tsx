@@ -5,6 +5,7 @@ import { Task, taskService } from "@/lib/taskService";
 import { CheckCircle2, AlertCircle, ArrowLeft, Loader2, Home, Camera, X } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
 import { ImageCapture } from "@/components/ImageCapture";
+import { Modal } from "@/components/Modal";
 
 interface Props {
   task: Task;
@@ -17,6 +18,7 @@ export function DomesticTaskModule({ task, onBack }: Props) {
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [reason, setReason] = useState("");
   const [evidenceImage, setEvidenceImage] = useState<string | null>(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handleComplete = async () => {
     setIsFinishing(true);
@@ -102,7 +104,7 @@ export function DomesticTaskModule({ task, onBack }: Props) {
         {!showReasonInput ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full mt-4">
             <button
-              onClick={handleComplete}
+              onClick={() => setShowConfirmModal(true)}
               disabled={isFinishing}
               className="flex flex-col items-center gap-4 p-8 bg-emerald-500 text-white rounded-[2.5rem] shadow-xl hover:bg-emerald-600 transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
             >
@@ -149,6 +151,31 @@ export function DomesticTaskModule({ task, onBack }: Props) {
           </div>
         )}
       </div>
+
+      <Modal isOpen={showConfirmModal} onClose={() => setShowConfirmModal(false)} title="¿Estás seguro?">
+        <div className="flex flex-col items-center text-center">
+          <p className="text-lg text-gray-600 mb-8">
+            ¿Estás súper seguro de que ya terminaste esta tarea y quedó excelente?
+          </p>
+          <div className="flex gap-4 w-full">
+            <button
+              onClick={() => setShowConfirmModal(false)}
+              className="flex-1 py-3 bg-gray-100 text-gray-600 rounded-full font-bold hover:bg-gray-200 transition-colors"
+            >
+              Todavía no
+            </button>
+            <button
+              onClick={() => {
+                setShowConfirmModal(false);
+                handleComplete();
+              }}
+              className="flex-1 py-3 bg-emerald-500 text-white rounded-full font-bold hover:bg-emerald-600 transition-colors shadow-lg"
+            >
+              ¡Sí, terminé!
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -180,7 +180,10 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
 
   const handleCardClick = async (tarea: TareaPlanificada) => {
     if (tarea.tipo_modulo === "domestic") {
-      handleEstadoOptimistic(tarea, "completada");
+      const baseTask = dbTasksCache[tarea.modulo_id];
+      if (baseTask) {
+        onStartModule(baseTask);
+      }
     } else if (tarea.tipo_modulo === "assessment") {
       try {
         const { data: template } = await supabase.from("assessment_templates").select("*").eq("id", tarea.modulo_id).single();
