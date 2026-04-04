@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Task, taskService } from "@/lib/taskService";
+import { planService } from "@/lib/planService";
 import { CheckCircle2, AlertCircle, ArrowLeft, Loader2, Home, Camera, X } from "lucide-react";
 import { useAlert } from "@/lib/AlertContext";
 import { ImageCapture } from "@/components/ImageCapture";
@@ -31,6 +32,15 @@ export function DomesticTaskModule({ task, onBack }: Props) {
           evidence: evidenceImage
         }
       });
+      // Si este task proviene de un plan semanal, marcar la tarea planificada como completada
+      const planTaskId = (task.metadata as any)?.planTaskId;
+      if (planTaskId) {
+        try {
+          await planService.updateEstadoTareaPlanificada(planTaskId, 'completada');
+        } catch (e) {
+          console.error('Error actualizando estado de tarea planificada:', e);
+        }
+      }
       onBack();
     } catch (err) {
       console.error(err);
@@ -48,6 +58,15 @@ export function DomesticTaskModule({ task, onBack }: Props) {
         status: "failed", 
         reason_not_done: reason 
       });
+      // Si este task proviene de un plan semanal, marcar la tarea planificada como en revisión
+      const planTaskId = (task.metadata as any)?.planTaskId;
+      if (planTaskId) {
+        try {
+          await planService.updateEstadoTareaPlanificada(planTaskId, 'en_revision');
+        } catch (e) {
+          console.error('Error actualizando estado de tarea planificada:', e);
+        }
+      }
       onBack();
     } catch (err) {
       console.error(err);

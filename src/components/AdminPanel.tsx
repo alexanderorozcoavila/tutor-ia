@@ -31,6 +31,8 @@ export function AdminPanel() {
   const [editPassword, setEditPassword] = useState("");
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [attentionMessage, setAttentionMessage] = useState("");
+  const [notificationSound, setNotificationSound] = useState<string>('/notification.mp3');
+  const [attentionMaxMinutes, setAttentionMaxMinutes] = useState<number>(0);
   const [isSettingsLoading, setIsSettingsLoading] = useState(false);
   const [newThemeName, setNewThemeName] = useState("");
   const [newThemeSlug, setNewThemeSlug] = useState("");
@@ -102,6 +104,8 @@ export function AdminPanel() {
     try {
       const settings = await settingsService.getSettings();
       setAttentionMessage(settings.attention_message);
+      setNotificationSound((settings as any).notification_sound || '/notification.mp3');
+      setAttentionMaxMinutes(Number((settings as any).attention_max_minutes) || 0);
     } catch (err) {
       console.error(err);
     }
@@ -329,7 +333,11 @@ export function AdminPanel() {
   const handleUpdateSettings = async () => {
     setIsSettingsLoading(true);
     try {
-      await settingsService.updateSettings({ attention_message: attentionMessage });
+      await settingsService.updateSettings({
+        attention_message: attentionMessage,
+        notification_sound: notificationSound,
+        attention_max_minutes: Math.min(5, Math.max(0, Number(attentionMaxMinutes) || 0))
+      });
       showAlert("Configuración global actualizada", { type: "success" });
     } catch (err: any) {
       showAlert(err.message, { type: "error" });
@@ -1073,13 +1081,67 @@ export function AdminPanel() {
                     placeholder="Ej: ¡Hola! ¿Cómo vas? Sigamos juntos."
                     className="w-full bg-white/10 p-3 rounded-lg border border-white/20 text-sm focus:border-indigo-400 outline-none transition-all h-20 resize-none"
                   />
-                  <button 
-                    onClick={handleUpdateSettings}
-                    disabled={isSettingsLoading}
-                    className="w-full py-3 bg-indigo-500 hover:bg-indigo-400 text-white rounded-lg font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isSettingsLoading ? <Loader2 className="animate-spin" size={14} /> : <><Save size={14} /> Guardar Cambios</>}
-                  </button>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="col-span-1 md:col-span-1">
+                      <label className="text-[10px] font-bold text-indigo-300">Duración máxima alerta (minutos, 0=5s)</label>
+                      <input type="number" min={0} max={5} value={attentionMaxMinutes}
+                        onChange={e => setAttentionMaxMinutes(Number(e.target.value))}
+                        className="w-full bg-white/10 p-3 rounded-lg border border-white/20 text-sm focus:border-indigo-400 outline-none" />
+                      <p className="text-[10px] text-indigo-300 mt-1">Máximo 5 minutos</p>
+                    </div>
+                    <div className="col-span-1 md:col-span-1">
+                      <label className="text-[10px] font-bold text-indigo-300">Sonido de notificación (URL)</label>
+                      <div className="flex flex-col gap-2">
+                        <div className="flex gap-2">
+                          <select value={notificationSound} onChange={(e) => setNotificationSound(e.target.value)}
+                            className="flex-none bg-white/10 p-3 rounded-lg border border-white/20 text-sm focus:border-indigo-400 outline-none mr-2">
+                            <option value="/sounds/beep.mp3">Beep (por defecto)</option>
+                            <option value="/sounds/chime.mp3">Chime</option>
+                            <option value="/sounds/ding.mp3">Ding</option>
+                            <option value="/sounds/whatsapp.mp3">WhatsApp-style</option>
+                            <option value="">Personalizada (URL abajo)</option>
+                          </select>
+                          <input type="text" value={notificationSound} onChange={e => setNotificationSound(e.target.value)}
+                            className="flex-1 bg-white/10 p-3 rounded-lg border border-white/20 text-sm focus:border-indigo-400 outline-none" />
+                        </div>
+                        <div>
+                          <button type="button" onClick={async () => {
+                              const url = notificationSound || '/notification.mp3';
+                              try {
+                                await new Audio(url).play();
+                              } catch (e) {
+                                try {
+                                  const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+                                  if (!AudioContextClass) throw e;
+                                  const ctx = new AudioContextClass();
+                                  const o = ctx.createOscillator();
+                                  const g = ctx.createGain();
+                                  o.type = 'sine';
+                                  o.frequency.value = 880;
+                                  g.gain.value = 0.05;
+                                  o.connect(g);
+                                  g.connect(ctx.destination);
+                                  o.start();
+                                  setTimeout(() => { o.stop(); ctx.close(); }, 400);
+                                } catch (_) {
+                                }
+                              }
+                            }}
+                            className="px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20">Probar</button>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-indigo-300 mt-1">Sube sonidos a /public o usa una URL externa.</p>
+                    </div>
+                    <div className="col-span-1 md:col-span-1 flex items-end">
+                      <button 
+                        onClick={handleUpdateSettings}
+                        disabled={isSettingsLoading}
+                        className="w-full py-3 bg-indigo-500 hover:bg-indigo-400 text-white rounded-lg font-black text-xs shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isSettingsLoading ? <Loader2 className="animate-spin" size={14} /> : <><Save size={14} /> Guardar Cambios</>}
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
               

@@ -13,6 +13,7 @@ import { RichTextEditor } from "@/components/RichTextEditor";
 import { useAuth } from "@/lib/AuthContext";
 import { planService, PlanSemanal, evalEstadoLMS } from "@/lib/planService";
 import { useAlert } from "@/lib/AlertContext";
+import { settingsService } from "@/lib/settingsService";
 
 interface Props {
   studentId?: string;
@@ -35,6 +36,7 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   const [readingText, setReadingText] = useState("");
   const [supportedDevices, setSupportedDevices] = useState<string[]>(['desktop', 'tablet', 'mobile']);
   const [isSaving, setIsSaving] = useState(false);
+  const [globalAttentionMaxMinutes, setGlobalAttentionMaxMinutes] = useState<number | null>(null);
   const [showRaw, setShowRaw] = useState(false);
 
   const { user } = useAuth();
@@ -55,6 +57,19 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
       }).catch(err => console.error("Error fetching plans:", err));
     }
   }, [user, studentId]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const s = await settingsService.getSettings();
+        if (typeof (s as any).attention_max_minutes !== 'undefined') {
+          setGlobalAttentionMaxMinutes(Math.min(5, Number((s as any).attention_max_minutes) || 0));
+        }
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   const togglePlan = (id: string) => {
     setSelectedPlanIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -299,9 +314,14 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
               <div className="space-y-3">
                 <label className="text-xs font-black text-indigo-400 uppercase tracking-tighter flex justify-between items-center">
                   Alerta de atención
-                  <span className={`px-2 py-0.5 rounded text-[10px] ${alertInterval === 0 ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-600'}`}>
-                    {alertInterval === 0 ? "Desactivado" : `${alertInterval}s`}
-                  </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-[10px] ${alertInterval === 0 ? 'bg-gray-100 text-gray-500' : 'bg-amber-100 text-amber-600'}`}>
+                        {alertInterval === 0 ? "Desactivado" : `${alertInterval}s`}
+                      </span>
+                      {globalAttentionMaxMinutes !== null && (
+                        <span className="text-[11px] text-gray-500">Máx admin: {globalAttentionMaxMinutes} min</span>
+                      )}
+                    </div>
                 </label>
                 <input 
                   type="range" min="0" max="30" step="5" value={alertInterval} 

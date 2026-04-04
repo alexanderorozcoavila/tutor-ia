@@ -255,7 +255,16 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
     if (tarea.tipo_modulo === "domestic") {
       const baseTask = dbTasksCache[tarea.modulo_id];
       if (baseTask) {
-        onStartModule(baseTask);
+        // Inyectar referencia a la tarea planificada para que el módulo pueda actualizar su estado
+        const taskWithPlanRef: Task = {
+          ...baseTask,
+          metadata: {
+            ...(baseTask.metadata || {}),
+            is_plan_task: true,
+            planTaskId: tarea.id,
+          }
+        };
+        onStartModule(taskWithPlanRef);
       }
     } else if (tarea.tipo_modulo === "assessment") {
       try {

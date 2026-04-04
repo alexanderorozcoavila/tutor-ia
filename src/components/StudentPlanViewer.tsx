@@ -27,17 +27,17 @@ const NIVEL_CONFIG = [
 // ─── Componente tarjeta de recompensa ─────────────────────────────────────────
 interface RewardCardProps {
   rd: RecompensaDiaria & { recompensa?: Recompensa };
-  currentLevel: number;
+  // currentLevel removed; unlocking now driven by jornadas (mañana/tarde/noche)
+  isUnlocked?: boolean;
   isActivated: boolean;
   isActivating: boolean;
   onActivar: (rd: RecompensaDiaria & { recompensa?: Recompensa }) => void;
   newlyUnlocked: boolean;
 }
 
-function RewardCard({ rd, currentLevel, isActivated, isActivating, onActivar, newlyUnlocked }: RewardCardProps) {
+function RewardCard({ rd, isUnlocked, isActivated, isActivating, onActivar, newlyUnlocked }: RewardCardProps & { isUnlocked: boolean }) {
   const rInfo = (rd as any).recompensa as Recompensa | undefined;
   const cfg = NIVEL_CONFIG.find(n => n.nivel === rd.nivel_requerido) || NIVEL_CONFIG[0];
-  const isUnlocked = currentLevel >= rd.nivel_requerido;
 
   return (
     <div
@@ -84,7 +84,7 @@ function RewardCard({ rd, currentLevel, isActivated, isActivating, onActivar, ne
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-          {isUnlocked ? (
+            {isUnlocked ? (
             <>
               <p className={`font-black text-base leading-tight ${cfg.text}`}>{rInfo?.nombre || "Recompensa"}</p>
               <p className="text-xs font-bold text-gray-400 mt-0.5 flex items-center gap-1">
@@ -94,7 +94,7 @@ function RewardCard({ rd, currentLevel, isActivated, isActivating, onActivar, ne
           ) : (
             <>
               <p className="font-black text-base text-gray-300">Bloqueada</p>
-              <p className="text-xs font-bold text-gray-300 mt-0.5">Llega al {cfg.label} para desbloquear</p>
+              <p className="text-xs font-bold text-gray-300 mt-0.5">Completa la jornada para desbloquear</p>
             </>
           )}
 
@@ -107,7 +107,7 @@ function RewardCard({ rd, currentLevel, isActivated, isActivating, onActivar, ne
         </div>
 
         {/* Botón o estado */}
-        {isUnlocked && (
+            {isUnlocked && (
           isActivated ? (
             <div className="flex-shrink-0 flex flex-col items-center gap-1 text-center">
               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
@@ -115,7 +115,7 @@ function RewardCard({ rd, currentLevel, isActivated, isActivating, onActivar, ne
               </div>
               <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Usada hoy</p>
             </div>
-          ) : (
+                  ) : (
             <button
               onClick={() => onActivar(rd)}
               disabled={isActivating}
@@ -161,9 +161,9 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
     handleCardClick,
   } = useStudentPlan(plan, onStartModule);
 
-  // dailyLevel: compatibilidad con el RewardCard que usa el sistema antiguo de niveles
-  // Se deriva del conteo de medallas de jornada obtenidas (0 a 3)
-  const dailyLevel = (jornadasMedals.manana ? 1 : 0) + (jornadasMedals.tarde ? 1 : 0) + (jornadasMedals.noche ? 1 : 0);
+  // Compat: mapear nivel_requerido a jornada (1=mañana,2=tarde,3=noche)
+  const nivelToJornada = (n: number) => (n === 1 ? 'manana' : n === 2 ? 'tarde' : 'noche');
+  const unlockedCount = recompensasDelDia.filter((rd: any) => rd.recompensa_id && (jornadasMedals as any)[nivelToJornada(rd.nivel_requerido)]).length;
 
   const [onlyPending, setOnlyPending] = useState(false);
 
@@ -245,18 +245,18 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
           {/* Título con indicador de estado */}
           <div className="flex items-center justify-between px-1">
             <h3 className="text-xl font-black uppercase tracking-widest flex items-center gap-2"
-              style={{ color: dailyLevel > 0 ? "#d97706" : "#9ca3af" }}>
+              style={{ color: unlockedCount > 0 ? "#d97706" : "#9ca3af" }}>
               <Gift size={20} />
               Recompensas de Hoy
             </h3>
-            {dailyLevel === 0 && (
+            {unlockedCount === 0 && (
               <span className="text-xs font-black text-gray-400 bg-gray-100 px-3 py-1 rounded-full flex items-center gap-1">
                 <Lock size={10} /> Completa tareas para desbloquear
               </span>
             )}
-            {dailyLevel > 0 && (
+            {unlockedCount > 0 && (
               <span className="text-xs font-black text-amber-600 bg-amber-100 px-3 py-1 rounded-full animate-pulse">
-                ¡{recompensasDelDia.filter((rd: any) => dailyLevel >= rd.nivel_requerido && rd.recompensa_id).length} desbloqueadas!
+                ¡{unlockedCount} desbloqueadas!
               </span>
             )}
           </div>
@@ -266,17 +266,22 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
             {recompensasDelDia
               .filter((rd: any) => rd.recompensa_id) // solo las asignadas
               .sort((a: any, b: any) => a.nivel_requerido - b.nivel_requerido)
-              .map((rd: any) => (
-                <RewardCard
-                  key={rd.id}
-                  rd={rd}
-                  currentLevel={dailyLevel}
-                  isActivated={activatedRecompensas.has(rd.id)}
-                  isActivating={activatingRecompensaId === rd.id}
-                  onActivar={handleActivarRecompensa}
-                  newlyUnlocked={!!(newlyUnlockedNivel && newlyUnlockedNivel.id) && newlyUnlockedNivel.id >= rd.nivel_requerido?.toString() && !activatedRecompensas.has(rd.id)}
-                />
-              ))}
+              .map((rd: any) => {
+                const jornadaKey = nivelToJornada(rd.nivel_requerido);
+                const isUnlocked = (jornadasMedals as any)[jornadaKey];
+                const newly = !!(newlyUnlockedNivel && newlyUnlockedNivel.id === jornadaKey && !activatedRecompensas.has(rd.id));
+                return (
+                  <RewardCard
+                    key={rd.id}
+                    rd={rd}
+                    isUnlocked={isUnlocked}
+                    isActivated={activatedRecompensas.has(rd.id)}
+                    isActivating={activatingRecompensaId === rd.id}
+                    onActivar={handleActivarRecompensa}
+                    newlyUnlocked={newly}
+                  />
+                );
+              })}
           </div>
 
           {/* Barra de progreso hacia siguiente recompensa */}

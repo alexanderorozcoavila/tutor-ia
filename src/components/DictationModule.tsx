@@ -62,6 +62,8 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish, 
   const [evaluationFeedback, setEvaluationFeedback] = useState<{ success: boolean; message: string; detected_word?: string } | null>(null);
   const [evidencePhoto, setEvidencePhoto] = useState<string | null>(null);
   const [attentionMessage, setAttentionMessage] = useState("¡Hola! ¿Cómo vas? Sigamos juntos.");
+  const [notificationSound, setNotificationSound] = useState<string>('/notification.mp3');
+  const [attentionMaxMinutes, setAttentionMaxMinutes] = useState<number>(0); // 0 = default behavior (use small timeout)
 
   const [config, setConfig] = useState<Config>(initialConfig || {
     mode: "LIBRE",
@@ -241,6 +243,12 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish, 
       if (settings.attention_message) {
         setAttentionMessage(settings.attention_message);
       }
+      if (typeof settings.notification_sound !== 'undefined') {
+        setNotificationSound(settings.notification_sound || '/notification.mp3');
+      }
+      if (typeof settings.attention_max_minutes !== 'undefined') {
+        setAttentionMaxMinutes(Math.min(5, Number(settings.attention_max_minutes) || 0));
+      }
     };
     loadGlobalSettings();
   }, []);
@@ -275,11 +283,31 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish, 
           // Marcar alerta de atención para mostrar el visual
           if (config.enableAlerts && config.alertInterval > 0 && nextVal % config.alertInterval === 0) {
             setShowAlert(true);
-            try {
-              const audio = new Audio('/notification.mp3'); /* Or generic beep */
-              audio.play().catch(() => {});
-            } catch(e) {}
-            setTimeout(() => setShowAlert(false), 5000);
+            (async () => {
+              const url = notificationSound || '/notification.mp3';
+              try {
+                await new Audio(url).play();
+              } catch (e) {
+                try {
+                  const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+                  if (!AudioContextClass) throw e;
+                  const ctx = new AudioContextClass();
+                  const o = ctx.createOscillator();
+                  const g = ctx.createGain();
+                  o.type = 'sine';
+                  o.frequency.value = 660;
+                  g.gain.value = 0.04;
+                  o.connect(g);
+                  g.connect(ctx.destination);
+                  o.start();
+                  setTimeout(() => { o.stop(); ctx.close(); }, 600);
+                } catch (_) {
+                }
+              }
+            })();
+            // Duration: if admin configured attentionMaxMinutes use that (capped at 5), otherwise default 5s
+            const durationMs = attentionMaxMinutes && attentionMaxMinutes > 0 ? Math.min(5, attentionMaxMinutes) * 60 * 1000 : 5000;
+            setTimeout(() => setShowAlert(false), durationMs);
           }
 
           // Límite de tiempo en modo temporizador (si no es 0)
@@ -296,13 +324,10 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish, 
   }, [step, config.mode, config.timeLimit, config.alertInterval]);
 
   // Alerta de audio separada del intervalo del timer para evitar duplicidad
+  // Replace spoken attentionMessage with notification sound only (visual alert handled above)
   useEffect(() => {
-    if (step === "DICTATING" && config.enableAlerts && config.alertInterval > 0) {
-      if (timer > 0 && timer % config.alertInterval === 0) {
-        speak(attentionMessage);
-      }
-    }
-  }, [timer, step, config.enableAlerts, config.alertInterval, speak, attentionMessage]);
+    // no-op: we handled audio playback in the interval effect to centralize timing
+  }, [timer, step, config.enableAlerts, config.alertInterval]);
 
   // Dictar frase automática al cambiar
   useEffect(() => {

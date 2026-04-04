@@ -12,10 +12,12 @@ import { Calendar, Save, Award, Loader2, Sparkles, Trash2, Info, Gift, X, Clock,
 // ─── Sub-componente: Panel de recompensas diarias expandible ─────────────────
 
 const DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
-const NIVELES = [
-  { nivel: 1, label: "Nivel 1 (80%)", color: "text-slate-500", bg: "bg-slate-100", border: "border-slate-200" },
-  { nivel: 2, label: "Nivel 2 (90%)", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
-  { nivel: 3, label: "Nivel 3 (100%)", color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
+// Mapeo sencillo: usamos el campo `nivel_requerido` en BD para identificar la jornada
+// 1 = Mañana, 2 = Tarde, 3 = Noche
+const JORNADAS = [
+  { nivel: 1, key: 'manana', label: "Mañana", color: "text-slate-500", bg: "bg-slate-100", border: "border-slate-200" },
+  { nivel: 2, key: 'tarde',  label: "Tarde",  color: "text-amber-600", bg: "bg-amber-50",  border: "border-amber-200" },
+  { nivel: 3, key: 'noche',  label: "Noche",  color: "text-emerald-700", bg: "bg-emerald-50", border: "border-emerald-200" },
 ];
 
 interface DailyRewardsPanelProps {
@@ -78,7 +80,7 @@ function DailyRewardsPanel({ planId, recompensasDiarias, catalogo, isLoading, on
   return (
     <div className="border-t-2 border-amber-100 bg-amber-50/40 p-5 animate-in slide-in-from-top-2 duration-300">
       <h5 className="text-xs font-black uppercase tracking-widest text-amber-700 mb-4 flex items-center gap-2">
-        <Gift size={14} /> Recompensas por Día y Nivel de Logro
+        <Gift size={14} /> Recompensas por Día y Jornada
         <span className="text-amber-400 font-bold normal-case text-[10px]">(Opcional)</span>
       </h5>
 
@@ -90,7 +92,7 @@ function DailyRewardsPanel({ planId, recompensasDiarias, catalogo, isLoading, on
             <thead>
               <tr>
                 <th className="text-left text-gray-400 font-black uppercase tracking-wider pb-2 pr-3 w-24">Día</th>
-                {NIVELES.map(n => (
+                {JORNADAS.map(n => (
                   <th key={n.nivel} className={`text-center pb-2 px-2 font-black ${n.color}`}>{n.label}</th>
                 ))}
               </tr>
@@ -101,7 +103,7 @@ function DailyRewardsPanel({ planId, recompensasDiarias, catalogo, isLoading, on
                   <td className="py-2 pr-3">
                     <span className="font-black text-gray-700">{DIAS[dia]}</span>
                   </td>
-                  {NIVELES.map(n => {
+                  {JORNADAS.map(n => {
                     const rd = getRecompensaDia(dia, n.nivel);
                     const rInfo = rd ? catalogo.find(r => r.id === rd.recompensa_id) : null;
                     return (
@@ -145,7 +147,7 @@ function DailyRewardsPanel({ planId, recompensasDiarias, catalogo, isLoading, on
               <div>
                 <h3 className="text-xl font-black text-gray-900">Asignar Recompensa</h3>
                 <p className="text-sm font-bold text-amber-600">
-                  {DIAS[modalDia]} — {NIVELES.find(n => n.nivel === modalNivel)?.label}
+                  {DIAS[modalDia]} — {JORNADAS.find(n => n.nivel === modalNivel)?.label}
                 </p>
               </div>
               <button onClick={() => setModalDia(null)} className="text-gray-300 hover:text-gray-500 transition-colors">
@@ -155,9 +157,9 @@ function DailyRewardsPanel({ planId, recompensasDiarias, catalogo, isLoading, on
 
             {/* Selector de nivel */}
             <div>
-              <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2 block">Nivel de Logro</label>
+              <label className="text-xs font-black text-gray-400 uppercase tracking-widest mb-2 block">Jornada</label>
               <div className="grid grid-cols-3 gap-2">
-                {NIVELES.map(n => (
+                {JORNADAS.map(n => (
                   <button
                     key={n.nivel}
                     onClick={() => setModalNivel(n.nivel)}
@@ -167,9 +169,7 @@ function DailyRewardsPanel({ planId, recompensasDiarias, catalogo, isLoading, on
                         : "bg-gray-50 border-gray-100 text-gray-400 hover:border-gray-200"
                     }`}
                   >
-                    {n.label.split(" ")[0]} {n.label.split(" ")[1]}
-                    <br />
-                    <span className="font-bold">{n.label.split(" ")[2]}</span>
+                    {n.label}
                   </button>
                 ))}
               </div>
@@ -621,8 +621,14 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
                     <div className="flex gap-2 flex-shrink-0">
                       <button
                         onClick={() => {
-                          setExpandedPlanId(isExpanded ? null : p.id);
+                          const newId = isExpanded ? null : p.id;
+                          setExpandedPlanId(newId);
                           setSelectedDay(null);
+                          if (!isExpanded) {
+                            loadRecompensasDiarias(p.id);
+                          } else {
+                            setRecompensasDiarias([]);
+                          }
                         }}
                         className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
                           isExpanded ? "bg-emerald-600 text-white" : "bg-white text-emerald-600 border border-emerald-100 hover:bg-emerald-50"
