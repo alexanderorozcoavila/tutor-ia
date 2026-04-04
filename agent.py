@@ -124,7 +124,10 @@ def lanzar_recompensa(recompensa: dict) -> Optional[subprocess.Popen]:
         os.system("sudo ufw default allow outgoing > /dev/null 2>&1")
         profile_dir = "/tmp/tutor_reward_isolated_session"
         os.system(f"rm -rf {profile_dir} > /dev/null 2>&1")
-        comando = f"sudo -u {USUARIO_LINUX} DISPLAY=:0 chromium-browser --user-data-dir={profile_dir} --kiosk --app={url}"
+        
+        # FIX: Homologado a google-chrome y con las variables de audio inyectadas
+        entorno = "env DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus XDG_RUNTIME_DIR=/run/user/1000"
+        comando = f"sudo -u {USUARIO_LINUX} {entorno} google-chrome --user-data-dir={profile_dir} --kiosk --app={url}"
         return subprocess.Popen(comando, shell=True)
 
     elif tipo == "comando":
@@ -144,8 +147,10 @@ def abrir_kiosco_home():
     if proceso_kiosco_home is not None:
         return
     log.info(f"🏠 Iniciando App Local: {KIOSCO_HOME_URL}")
-    cmd = f"sudo -u {USUARIO_LINUX} env DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path/run/user/1000/bus XDG_RUNTIME_DIR=/run/user/1000 google-chrome --autoplay-policy=no-user-gesture-required --kiosk --app={KIOSCO_HOME_URL}"
+    # FIX: path=/run... corregido para evitar la caída del motor TTS
+    cmd = f"sudo -u {USUARIO_LINUX} env DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus XDG_RUNTIME_DIR=/run/user/1000 google-chrome --autoplay-policy=no-user-gesture-required --kiosk --app={KIOSCO_HOME_URL}"
     proceso_kiosco_home = subprocess.Popen(cmd, shell=True)
+
 
 
 def cerrar_recompensa():
@@ -164,7 +169,8 @@ def cerrar_recompensa():
 def cerrar_kiosco_home():
     global proceso_kiosco_home
     if proceso_kiosco_home:
-        os.system(f"pkill -u {USUARIO_LINUX} chromium-browser > /dev/null 2>&1")
+        # FIX: Matar el proceso correcto ('chrome' es el nombre del binario de google-chrome)
+        os.system(f"pkill -u {USUARIO_LINUX} chrome > /dev/null 2>&1")
         proceso_kiosco_home = None
 
 
