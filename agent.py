@@ -122,7 +122,9 @@ def lanzar_recompensa(recompensa: dict) -> Optional[subprocess.Popen]:
             return None
         log.info(f"🎮 Abriendo recompensa '{nombre}': {url}")
         os.system("sudo ufw default allow outgoing > /dev/null 2>&1")
-        comando = f"sudo -u {USUARIO_LINUX} DISPLAY=:0 chromium-browser --kiosk --app={url}"
+        profile_dir = "/tmp/tutor_reward_isolated_session"
+        os.system(f"rm -rf {profile_dir} > /dev/null 2>&1")
+        comando = f"sudo -u {USUARIO_LINUX} DISPLAY=:0 chromium-browser --user-data-dir={profile_dir} --kiosk --app={url}"
         return subprocess.Popen(comando, shell=True)
 
     elif tipo == "comando":
@@ -150,7 +152,9 @@ def cerrar_recompensa():
     global proceso_recompensa
     if proceso_recompensa:
         log.info("🔒 Cerrando recompensa y bloqueando internet...")
-        os.system("pkill -f 'chromium-browser --kiosk --app' > /dev/null 2>&1")
+        os.system(f"sudo -u {USUARIO_LINUX} DISPLAY=:0 xdotool key Escape > /dev/null 2>&1")
+        time.sleep(0.5)
+        os.system("pkill -9 -f 'tutor_reward_isolated_session' > /dev/null 2>&1")
         os.system("sudo ufw default deny outgoing > /dev/null 2>&1")
         os.system("sudo ufw allow out to any port 443 > /dev/null 2>&1")
         os.system("sudo ufw allow out to any port 53 > /dev/null 2>&1")

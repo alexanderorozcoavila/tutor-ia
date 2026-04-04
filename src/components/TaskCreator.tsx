@@ -41,6 +41,7 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
   const [availablePlans, setAvailablePlans] = useState<PlanSemanal[]>([]);
   const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   const [planDays, setPlanDays] = useState<number[]>([]);
+  const [selectedJornada, setSelectedJornada] = useState<string | null>(null); // null = Flexible
 
   useEffect(() => {
     if (user && studentId) {
@@ -126,7 +127,8 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
               type, 
               studentId, 
               planDays, 
-              10 // 10 puntos por defecto
+              10, // 10 puntos por defecto
+              selectedJornada
             )
           )
         );
@@ -402,25 +404,53 @@ export function TaskCreator({ studentId, onTaskCreated, onCancel }: Props) {
             </div>
 
             {selectedPlanIds.length > 0 ? (
-              <div className="pt-4 border-t border-emerald-100">
-                <p className="text-xs text-emerald-600 mb-2 font-bold">2. Selecciona los días de aparición automática:</p>
-                <div className="flex gap-2 flex-wrap">
-                  {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => (
-                    <button
-                      key={i}
-                      type="button"
-                      onClick={() => toggleDay(i)}
-                      className={`px-4 py-2 rounded-xl font-bold transition-all ${
-                        planDays.includes(i) 
-                          ? 'bg-emerald-500 text-white shadow-md' 
-                          : 'bg-white text-gray-400 border-2 border-emerald-100 hover:bg-emerald-50'
-                      }`}
-                    >
-                      {d}
-                    </button>
-                  ))}
+              <>
+                <div className="pt-4 border-t border-emerald-100">
+                  <p className="text-xs text-emerald-600 mb-2 font-bold">2. Selecciona los días de aparición automática:</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map((d, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => toggleDay(i)}
+                        className={`px-4 py-2 rounded-xl font-bold transition-all ${
+                          planDays.includes(i) 
+                            ? 'bg-emerald-500 text-white shadow-md' 
+                            : 'bg-white text-gray-400 border-2 border-emerald-100 hover:bg-emerald-50'
+                        }`}
+                      >
+                        {d}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+
+                <div className="pt-4 border-t border-emerald-100">
+                  <p className="text-xs text-indigo-600 mb-2 font-bold">3. Selecciona la jornada (horario):</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {[
+                      { key: null, label: "Flexible", emoji: "🔄", color: "bg-gray-100 text-gray-500", active: "bg-gray-500 text-white" },
+                      { key: "08:00:00", label: "Mañana", emoji: "🌅", color: "bg-amber-50 text-amber-600 border-amber-100", active: "bg-amber-400 text-white" },
+                      { key: "14:00:00", label: "Tarde", emoji: "☀️", color: "bg-orange-50 text-orange-600 border-orange-100", active: "bg-orange-400 text-white" },
+                      { key: "20:00:00", label: "Noche", emoji: "🌙", color: "bg-indigo-50 text-indigo-600 border-indigo-100", active: "bg-indigo-500 text-white" },
+                    ].map((j) => (
+                      <button
+                        key={j.label || 'flex'}
+                        type="button"
+                        onClick={() => setSelectedJornada(j.key)}
+                        className={`px-4 py-2 rounded-xl flex items-center gap-2 font-bold transition-all border-2 ${
+                          selectedJornada === j.key 
+                            ? j.active 
+                            : `${j.color} hover:bg-opacity-80`
+                        }`}
+                      >
+                        <span>{j.emoji}</span>
+                        <span>{j.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
             ) : (
                <p className="text-xs text-amber-600 italic font-bold">Selecciona al menos un plan arriba para programar días.</p>
             )}

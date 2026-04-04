@@ -275,7 +275,11 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish, 
           // Marcar alerta de atención para mostrar el visual
           if (config.enableAlerts && config.alertInterval > 0 && nextVal % config.alertInterval === 0) {
             setShowAlert(true);
-            setTimeout(() => setShowAlert(false), 3000);
+            try {
+              const audio = new Audio('/notification.mp3'); /* Or generic beep */
+              audio.play().catch(() => {});
+            } catch(e) {}
+            setTimeout(() => setShowAlert(false), 5000);
           }
 
           // Límite de tiempo en modo temporizador (si no es 0)
@@ -543,7 +547,7 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish, 
             <div className="space-y-4">
               <label className="block text-sm font-bold text-gray-500 uppercase">Alertas de atención (cada X segundos)</label>
               <input
-                type="range" min="0" max="30" step="5"
+                type="range" min="0" max="300" step="15"
                 value={config.alertInterval}
                 onChange={(e) => setConfig({ ...config, alertInterval: parseInt(e.target.value) })}
                 className="w-full h-3 bg-indigo-100 rounded-lg appearance-none cursor-pointer accent-indigo-500"
@@ -690,13 +694,14 @@ export function DictationModule({ taskId, initialText, initialConfig, onFinish, 
             {isLocked ? (isSpeaking ? "Escucha..." : "Espera...") : "¡Siguiente!"} {!isLocked && <CheckCircle2 size={24} />}
           </button>
         </div>
-        {/* Alerta de Atención */}
+        {/* Alerta de Atención Toast */}
         {showAlert && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center pointer-events-none p-12">
-            <div className="bg-indigo-500 text-white p-12 rounded-[3rem] shadow-full flex flex-col items-center gap-6 animate-bounce border-8 border-white">
-              <BellRing size={80} className="animate-wiggle" />
-              <h2 className="text-4xl font-black">¿Cómo vas?</h2>
-              <p className="text-2xl">¡Sigamos juntos!</p>
+          <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] pointer-events-none animate-in slide-in-from-bottom-5 fade-in duration-300">
+            <div className="bg-indigo-600 text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-4 border-2 border-indigo-300">
+              <BellRing size={24} className="animate-wiggle" />
+              <div className="flex flex-col">
+                <span className="text-lg font-black">{attentionMessage}</span>
+              </div>
             </div>
           </div>
         )}

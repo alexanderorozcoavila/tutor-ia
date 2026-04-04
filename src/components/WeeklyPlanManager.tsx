@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { planService, PlanSemanal, getFechasPlan } from "@/lib/planService";
+import { planService, PlanSemanal, TareaPlanificada, getFechasPlan } from "@/lib/planService";
 import { rewardService, Recompensa, RecompensaDiaria } from "@/lib/rewardService";
+import { taskService, Task } from "@/lib/taskService";
 import { useAuth } from "@/lib/AuthContext";
 import { useAlert } from "@/lib/AlertContext";
 import { RichTextEditor } from "@/components/RichTextEditor";
-import { Calendar, Save, Award, Loader2, Sparkles, Trash2, Info, Gift, X } from "lucide-react";
+import { Calendar, Save, Award, Loader2, Sparkles, Trash2, Info, Gift, X, Clock, Settings2, Pencil, ChevronLeft } from "lucide-react";
 
 // ─── Sub-componente: Panel de recompensas diarias expandible ─────────────────
 
@@ -241,6 +242,187 @@ function DailyRewardsPanel({ planId, recompensasDiarias, catalogo, isLoading, on
   );
 }
 
+// ─── Sub-componente: Editor de Jornadas por Tarea ────────────────────────────
+
+const TIPO_EMOJI_MAP: Record<string, string> = {
+  dictation: "📝", reading: "📖", domestic: "🏡", assessment: "📊"
+};
+const TIPO_LABEL_MAP: Record<string, string> = {
+  dictation: "Dictado", reading: "Lectura", domestic: "Tarea del Hogar", assessment: "Evaluación"
+};
+const JORNADA_OPTS = [
+  { key: "flexible", label: "Flexible", emoji: "🔄", hora: null as string | null,
+    inactive: "bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-200",
+    active:   "bg-gray-500 text-white border-gray-500 shadow-sm" },
+  { key: "manana",   label: "Mañana",   emoji: "🌅", hora: "08:00:00" as string | null,
+    inactive: "bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100",
+    active:   "bg-amber-400 text-white border-amber-400 shadow-sm" },
+  { key: "tarde",    label: "Tarde",    emoji: "☀️", hora: "14:00:00" as string | null,
+    inactive: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100",
+    active:   "bg-orange-400 text-white border-orange-400 shadow-sm" },
+  { key: "noche",    label: "Noche",    emoji: "🌙", hora: "20:00:00" as string | null,
+    inactive: "bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100",
+    active:   "bg-indigo-500 text-white border-indigo-500 shadow-sm" },
+];
+
+interface TaskJornadaEditorProps {
+  plan: PlanSemanal;
+  taskCache: Record<string, Task>;
+  onSaved: () => void;
+  showAlert: (msg: string, opts?: any) => void;
+}
+
+function TaskJornadaEditor({ plan, taskCache, onSaved, showAlert }: TaskJornadaEditorProps) {
+  const DIAS_FULL = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+  const [edits, setEdits] = useState<Record<string, string | null>>({});
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Tareas diarias (excluye evaluaciones semanales que tienen dia_semana=null)
+  const tareas = (plan.tareas || []).filter(t => t.dia_semana != null && t.tipo_modulo !== "assessment");
+
+  const getJornadaKey = (hora: string | null | undefined): string => {
+    if (!hora) return "flexible";
+    const h = parseInt(hora.split(":")[0]);
+    if (h < 12) return "manana";
+    if (h < 18) return "tarde";
+    return "noche";
+  };
+
+  const getCurrentHora = (tarea: TareaPlanificada): string | null => {
+    // Si fue editada localmente, tomar el valor del edits buffer
+    if (tarea.id in edits) return edits[tarea.id];
+    return tarea.hora_asignada ?? null;
+  };
+
+  const handleSave = async () => {
+    const changed = Object.entries(edits);
+    if (changed.length === 0) return showAlert("No hay cambios para guardar.", { type: "info" });
+    setIsSaving(true);
+    try {
+      await Promise.all(
+        changed.map(([id, hora]) =>
+          planService.updateTareaPlanificada(id, { hora_asignada: hora as any })
+        )
+      );
+      showAlert(`¡Jornadas guardadas para ${changed.length} tarea(s)!`, { type: "success" });
+      setEdits({});
+      onSaved();
+    } catch (err: any) {
+      showAlert(err.message || "Error al guardar jornadas", { type: "error" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const dias = [1, 2, 3, 4, 5, 6, 0]
+    .map(d => ({ dia: d, name: DIAS_FULL[d], tareas: tareas.filter(t => t.dia_semana === d) }))
+    .filter(g => g.tareas.length > 0);
+
+  const pendingCount = Object.keys(edits).length;
+
+  return (
+    <div className="border-t-2 border-blue-100 bg-blue-50/40 p-5 animate-in slide-in-from-top-2 duration-300 space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h5 className="text-xs font-black uppercase tracking-widest text-blue-700 flex items-center gap-2">
+          <Clock size={14} /> Jornadas por Tarea
+          <span className="text-blue-400 font-bold normal-case text-[10px]">(Mañana · Tarde · Noche)</span>
+        </h5>
+        <div className="flex items-center gap-3">
+          {pendingCount > 0 && (
+            <span className="text-[10px] font-black text-blue-600 bg-blue-100 px-2.5 py-0.5 rounded-full animate-pulse">
+              {pendingCount} cambio(s)
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={isSaving || pendingCount === 0}
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-xs font-black transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {isSaving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
+            Guardar Jornadas
+          </button>
+        </div>
+      </div>
+
+      {/* Leyenda de colores */}
+      <div className="flex flex-wrap gap-1.5">
+        {JORNADA_OPTS.map(j => (
+          <span key={j.key} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black border ${j.active}`}>
+            {j.emoji} {j.label}
+          </span>
+        ))}
+      </div>
+
+      {dias.length === 0 ? (
+        <div className="bg-white rounded-[1rem] border border-blue-100 p-6 text-center">
+          <Clock size={32} className="mx-auto text-blue-200 mb-2" />
+          <p className="text-sm font-bold text-blue-400">No hay tareas diarias en este plan.</p>
+          <p className="text-xs font-medium text-blue-300 mt-1">Asigna tareas por día desde el panel del tutor primero.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {dias.map(({ dia, name, tareas: dt }) => (
+            <div key={dia} className="bg-white rounded-[1rem] shadow-sm border border-blue-100 overflow-hidden">
+              <div className="px-4 py-2 bg-blue-50/80 border-b border-blue-100">
+                <span className="text-xs font-black text-blue-700 uppercase tracking-widest">{name}</span>
+              </div>
+              <div className="divide-y divide-blue-50">
+                {dt.map((tarea, i) => {
+                  const currentHora = getCurrentHora(tarea);
+                  const currentKey = getJornadaKey(currentHora);
+                  const isDirty = tarea.id in edits;
+                  return (
+                    <div
+                      key={tarea.id}
+                      className={`px-4 py-3 flex items-center gap-3 flex-wrap transition-colors duration-200 ${
+                        isDirty ? "bg-blue-50/60" : ""
+                      }`}
+                    >
+                      {/* Identificación de tarea */}
+                      <div className="flex items-center gap-2 flex-1 min-w-[120px]">
+                        <span className="text-xl">{TIPO_EMOJI_MAP[tarea.tipo_modulo] || "⭐"}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-gray-700 truncate" title={taskCache[tarea.modulo_id]?.title || TIPO_LABEL_MAP[tarea.tipo_modulo]}>
+                            {taskCache[tarea.modulo_id]?.title || TIPO_LABEL_MAP[tarea.tipo_modulo] || "Tarea"}
+                          </p>
+                          <p className="text-[9px] font-bold text-gray-400">
+                            #{i + 1}{isDirty && <span className="text-blue-500 ml-1">• editado</span>}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Botones de jornada */}
+                      <div className="flex gap-1 flex-wrap">
+                        {JORNADA_OPTS.map(opt => {
+                          const isActive = currentKey === opt.key;
+                          return (
+                            <button
+                              key={opt.key}
+                              onClick={() => setEdits(prev => ({ ...prev, [tarea.id]: opt.hora }))}
+                              className={`px-2.5 py-1.5 rounded-lg border text-[10px] font-black transition-all flex items-center gap-1 active:scale-95 ${
+                                isActive ? opt.active : opt.inactive
+                              }`}
+                              title={opt.label}
+                            >
+                              {opt.emoji}
+                              <span className="hidden sm:inline">{opt.label}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Componente Principal ─────────────────────────────────────────────────────
 
 export function WeeklyPlanManager({ studentId }: { studentId: string }) {
@@ -256,6 +438,10 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
   const [expandedPlanId, setExpandedPlanId] = useState<string | null>(null);
   const [recompensasDiarias, setRecompensasDiarias] = useState<RecompensaDiaria[]>([]);
   const [isRecompensasLoading, setIsRecompensasLoading] = useState(false);
+  const [expandedJornadaPlanId, setExpandedJornadaPlanId] = useState<string | null>(null);
+  const [taskCache, setTaskCache] = useState<Record<string, Task>>({});
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const [editingTarea, setEditingTarea] = useState<TareaPlanificada | null>(null);
 
   // Form State
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -298,10 +484,22 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
     }
   }, []);
 
+  const loadTaskCatalog = useCallback(async () => {
+    try {
+      const all = await taskService.getTasks();
+      const map: Record<string, Task> = {};
+      all.forEach(t => (map[t.id] = t));
+      setTaskCache(map);
+    } catch (err) {
+      console.error("Error cargando catálogo de tareas:", err);
+    }
+  }, []);
+
   useEffect(() => {
     loadPlanes();
     loadCatalogo();
-  }, [loadPlanes, loadCatalogo]);
+    loadTaskCatalog();
+  }, [loadPlanes, loadCatalogo, loadTaskCatalog]);
 
   const handleSavePlan = async () => {
     if (!user || !studentId) return;
@@ -402,6 +600,7 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
                 statusColor = "bg-gray-100 text-gray-400 font-medium line-through decoration-gray-300";
               }
               const isExpanded = expandedPlanId === p.id;
+              const isJornadaExpanded = expandedJornadaPlanId === p.id;
 
               return (
                 <div key={p.id} className="bg-white rounded-[1.5rem] shadow-sm border border-emerald-50 transition-all hover:border-emerald-200 overflow-hidden">
@@ -422,18 +621,27 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
                     <div className="flex gap-2 flex-shrink-0">
                       <button
                         onClick={() => {
-                          if (isExpanded) {
-                            setExpandedPlanId(null);
-                          } else {
-                            setExpandedPlanId(p.id);
-                            loadRecompensasDiarias(p.id);
-                          }
+                          setExpandedPlanId(isExpanded ? null : p.id);
+                          setSelectedDay(null);
                         }}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
-                          isExpanded ? "bg-amber-500 text-white border-amber-500" : "text-amber-600 hover:bg-amber-50 border-amber-100"
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                          isExpanded ? "bg-emerald-600 text-white" : "bg-white text-emerald-600 border border-emerald-100 hover:bg-emerald-50"
                         }`}
                       >
-                        <Gift size={14} /> Recompensas
+                        <Settings2 size={14} />
+                        {isExpanded ? "Cerrar" : "Gestionar Plan"}
+                      </button>
+                      <button
+                        onClick={() => {
+                          setExpandedJornadaPlanId(isJornadaExpanded ? null : p.id);
+                        }}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all border ${
+                          isJornadaExpanded
+                            ? "bg-blue-500 text-white border-blue-500"
+                            : "text-blue-600 hover:bg-blue-50 border-blue-100"
+                        }`}
+                      >
+                        <Clock size={14} /> Jornadas
                       </button>
                       <button
                         onClick={() => handleDeletePlan(p)}
@@ -446,12 +654,128 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
                   </div>
 
                   {isExpanded && (
+                    <div className="mt-8 pt-8 border-t-2 border-emerald-50 animate-in slide-in-from-top-4 duration-300">
+                      {selectedDay === null ? (
+                        /* Vista de Selección de Día */
+                        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                          {["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"].map((name, i) => {
+                            const dailyTasks = (p.tareas || []).filter(t => t.dia_semana === i);
+                            const count = dailyTasks.length;
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => setSelectedDay(i)}
+                                className="bg-white p-4 rounded-2xl border-2 border-emerald-50 hover:border-emerald-500 hover:shadow-lg transition-all group text-center"
+                              >
+                                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest group-hover:text-emerald-500">{name}</p>
+                                <p className="text-2xl font-black text-gray-800 my-1">{count}</p>
+                                <p className="text-[9px] font-bold text-gray-400">Tareas</p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        /* Vista Detalle Diario */
+                        <div className="space-y-6">
+                          <div className="flex justify-between items-center bg-white/50 p-4 rounded-2xl border border-emerald-100">
+                            <h4 className="font-black text-emerald-900 flex items-center gap-2">
+                              <Calendar size={18} />
+                              {["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"][selectedDay]}
+                            </h4>
+                            <button
+                              onClick={() => setSelectedDay(null)}
+                              className="text-xs font-black text-emerald-600 hover:underline flex items-center gap-1"
+                            >
+                              <ChevronLeft size={14} /> Volver a la semana
+                            </button>
+                          </div>
+
+                          <div className="space-y-3">
+                            {(p.tareas || []).filter(t => t.dia_semana === selectedDay).length === 0 ? (
+                              <div className="text-center py-10 bg-white/30 rounded-3xl border-2 border-dashed border-emerald-100">
+                                <p className="text-sm font-bold text-emerald-400">No hay tareas programadas para este día.</p>
+                              </div>
+                            ) : (
+                              (p.tareas || []).filter(t => t.dia_semana === selectedDay)
+                                .sort((a,b) => (a.orden_visual || 0) - (b.orden_visual || 0))
+                                .map((tarea) => {
+                                  const taskDetalle = taskCache[tarea.modulo_id];
+                                  const h = tarea.hora_asignada;
+                                  let jornadaLabel = "Flexible";
+                                  let jornadaColor = "bg-gray-100 text-gray-500";
+                                  if (h) {
+                                    const hr = parseInt(h.split(":")[0]);
+                                    if (hr < 12) { jornadaLabel = "Mañana"; jornadaColor = "bg-amber-100 text-amber-700"; }
+                                    else if (hr < 18) { jornadaLabel = "Tarde"; jornadaColor = "bg-orange-100 text-orange-700"; }
+                                    else { jornadaLabel = "Noche"; jornadaColor = "bg-indigo-100 text-indigo-700"; }
+                                  }
+
+                                  return (
+                                    <div key={tarea.id} className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-50 flex items-center justify-between gap-4 group hover:border-emerald-200 transition-all">
+                                      <div className="flex items-center gap-4 flex-1 min-w-0">
+                                        <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-xl shadow-inner">
+                                          {TIPO_EMOJI_MAP[tarea.tipo_modulo] || "⭐"}
+                                        </div>
+                                        <div className="min-w-0">
+                                          <p className="font-black text-gray-800 text-sm truncate">{taskDetalle?.title || TIPO_LABEL_MAP[tarea.tipo_modulo]}</p>
+                                          <div className="flex items-center gap-2 mt-0.5">
+                                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${jornadaColor}`}>
+                                              {jornadaLabel}
+                                            </span>
+                                            <span className="text-[9px] font-bold text-gray-400">
+                                              {tarea.puntos_valor} XP
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <button
+                                          onClick={() => setEditingTarea(tarea)}
+                                          className="p-2 text-blue-400 hover:bg-blue-50 rounded-lg transition-all"
+                                          title="Editar tarea"
+                                        >
+                                          <Pencil size={16} />
+                                        </button>
+                                        <button
+                                          onClick={async () => {
+                                            if (confirm("¿Eliminar esta tarea del plan?")) {
+                                              await planService.deleteTareaPlanificada(tarea.id);
+                                              loadPlanes();
+                                              showAlert("Tarea eliminada.", { type: "success" });
+                                            }
+                                          }}
+                                          className="p-2 text-red-300 hover:bg-red-50 hover:text-red-500 rounded-lg transition-all"
+                                          title="Eliminar tarea"
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {isExpanded && (
                     <DailyRewardsPanel
                       planId={p.id}
                       recompensasDiarias={recompensasDiarias}
                       catalogo={catalogoRecompensas}
                       isLoading={isRecompensasLoading}
                       onRefresh={loadRecompensasDiarias}
+                      showAlert={showAlert}
+                    />
+                  )}
+                  {isJornadaExpanded && (
+                    <TaskJornadaEditor
+                      plan={p}
+                      taskCache={taskCache}
+                      onSaved={loadPlanes}
                       showAlert={showAlert}
                     />
                   )}
@@ -553,6 +877,74 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
           </div>
         </div>
       </div>
+      {/* Modal de Edición Rápida */}
+      {editingTarea && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[600] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-sm shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-2xl font-black text-gray-900 mb-6">Editar Tarea</h3>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Jornada</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: null, label: "Flexible", emoji: "🔄" },
+                    { key: "08:00:00", label: "Mañana", emoji: "🌅" },
+                    { key: "14:00:00", label: "Tarde", emoji: "☀️" },
+                    { key: "20:00:00", label: "Noche", emoji: "🌙" },
+                  ].map((j) => (
+                    <button
+                      key={j.label}
+                      onClick={() => setEditingTarea({ ...editingTarea, hora_asignada: j.key })}
+                      className={`p-3 rounded-xl border-2 font-bold text-xs flex flex-col items-center gap-1 transition-all ${
+                        editingTarea.hora_asignada === j.key ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-gray-100 text-gray-400 hover:bg-gray-50"
+                      }`}
+                    >
+                      <span className="text-xl">{j.emoji}</span>
+                      {j.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest">Puntos XP</label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range" min="5" max="50" step="5"
+                    value={editingTarea.puntos_valor}
+                    onChange={(e) => setEditingTarea({ ...editingTarea, puntos_valor: parseInt(e.target.value) })}
+                    className="flex-1 accent-emerald-500"
+                  />
+                  <span className="text-lg font-black text-emerald-600 w-12">{editingTarea.puntos_valor}</span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setEditingTarea(null)}
+                  className="flex-1 py-4 bg-gray-100 text-gray-500 rounded-2xl font-black"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    await planService.updateTareaPlanificada(editingTarea.id, {
+                      hora_asignada: editingTarea.hora_asignada,
+                      puntos_valor: editingTarea.puntos_valor
+                    });
+                    setEditingTarea(null);
+                    loadPlanes();
+                    showAlert("Cambios guardados.", { type: "success" });
+                  }}
+                  className="flex-[2] py-4 bg-emerald-600 text-white rounded-2xl font-black shadow-lg hover:bg-emerald-700"
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

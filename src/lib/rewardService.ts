@@ -228,6 +228,12 @@ export const rewardService = {
   ): Promise<{ uso_id: string; recompensa_nombre: string; minutos: number }> {
     if (LS_MODE) throw new Error('No disponible en modo local');
 
+    const hoy = new Date().getDay();
+    const { data: rdcheck } = await supabase.from('recompensa_diaria').select('dia_semana').eq('id', recompensaDiariaId).single();
+    if (rdcheck && rdcheck.dia_semana !== hoy) {
+      throw new Error('Esta recompensa ha caducado. Solo es válida el día en que fue asignada.');
+    }
+
     const { data, error } = await supabase.rpc('activar_recompensa', {
       p_recompensa_diaria_id: recompensaDiariaId,
       p_alumno_id: alumnoId,

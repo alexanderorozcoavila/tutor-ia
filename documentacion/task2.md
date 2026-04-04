@@ -1,0 +1,22 @@
+- [x] Crear Documento Técnico en `documentacion/`
+- [x] Fase 1: Base de Datos y APIs Supabase
+  - [x] Migración SQL: `20260403_jornadas_schema.sql` (configuracion_jornadas, hora_asignada, is_gamificado, estado enum update, etc).
+  - [ ] Adaptar queries de Supabase en `planService.ts`
+- [x] Fase 2: Control de Sistema y Kiosco (`agent.py`)
+  - [x] Agregar flag `--user-data-dir` para perfilar procesos de recompensas separados
+  - [x] Cambiar forma de aniquilar procesos asegurando unicidad con `pkill` focalizado e inyección de xdotool ESC
+- [x] Fase 3: Caducidad Diaria de Recompensas (`rewardService.ts`)
+  - [x] Filtrar recompensas atrasadas de días anteriores para que `getRecompensasDiarias` y validaciones restrinjan el acceso a `dia_semana != dia_actual`
+- [x] Fase 4: UX de Notificaciones de Atención (Toast)
+  - [x] Ampliar límite de `alertInterval` a 300s en `DictationModule.tsx`
+  - [x] Retirar Modal agresivo
+  - [x] Incluir Toast no invasivo y reproducción de audio estándar ("burbuja")
+- [/] Fase 5: Gamificación y Componentes Visuales del Alumno
+  - [ ] Cambiar lógica de `calcularNivelDiario` (o similar) para calcular 3 medallas independientes en vez de niveles interdependientes
+  - [ ] Modificar `useStudentPlan.ts` para exponer el estado de las medallas individuales
+  - [ ] Adaptar UI de `MinecraftStudentViewer.tsx` y `StudentPlanViewer.tsx` para mostrar "Rack de Medallas de Jornadas"
+  - [ ] Filtrar tareas visibles para el estudiante dependiendo del match horario, mostrando además las tareas atemporales (sin hora).
+- [ ] Fase 6: Panel del Tutor
+  - [ ] Remover listado gigante del `TutorDashboard.tsx`
+  - [ ] Integrar nuevo editor de visualización de tareas por Plan (`PlanTasksEditor.tsx` / `WeeklyPlanManager`)
+  - [ ] Configurar edición y mutación de `hora_asignada` y jornadas

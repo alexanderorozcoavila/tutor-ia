@@ -5,7 +5,8 @@ import { User, userService } from "@/lib/userService";
 import { settingsService } from "@/lib/settingsService";
 import { lmsService, Subject } from "@/lib/lmsService";
 import { rewardService, Recompensa } from "@/lib/rewardService";
-import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon, Monitor, UserCheck } from "lucide-react";
+
+import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon, Monitor, UserCheck, Clock, Info } from "lucide-react";
 import { systemMenuService, MenuAccionCompleta } from "@/lib/systemMenuService";
 import { Modal } from "./Modal";
 import { AudioDiagnosticsPanel } from "./AudioDiagnosticsPanel";
@@ -19,7 +20,7 @@ export function AdminPanel() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"tutor" | "admin">("tutor");
   const [isCreating, setIsCreating] = useState(false);
-  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "menu" | "audio" | "settings">("users");
+  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "menu" | "audio" | "jornadas" | "settings">("users");
   const [themes, setThemes] = useState<any[]>([]);
   const [isThemesLoading, setIsThemesLoading] = useState(false);
 
@@ -76,6 +77,14 @@ export function AdminPanel() {
   // Modal de Asignación a Tutor
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [selectedTutorSubjects, setSelectedTutorSubjects] = useState<string[]>([]);
+
+  // Configuración de Jornadas
+  const [jornadaConfig, setJornadaConfig] = useState({
+    rango_manana: "00:00-11:59",
+    rango_tarde: "12:00-17:59",
+    rango_noche: "18:00-23:59"
+  });
+  const [isJornadaSaving, setIsJornadaSaving] = useState(false);
 
   const loadUsers = async () => {
     setIsLoading(true);
@@ -200,6 +209,41 @@ export function AdminPanel() {
     }
   };
 
+  const loadJornadaConfig = async () => {
+    try {
+      const res = await fetch('/api/jornadas');
+      if (!res.ok) throw new Error('Error al cargar jornadas');
+      const data = await res.json();
+      if (data) {
+        setJornadaConfig({
+          rango_manana: data.rango_manana,
+          rango_tarde: data.rango_tarde,
+          rango_noche: data.rango_noche
+        });
+      }
+    } catch (e) {
+      console.error("Error cargando jornadas:", e);
+    }
+  };
+
+  const handleSaveJornadaConfig = async () => {
+    setIsJornadaSaving(true);
+    try {
+      const res = await fetch('/api/jornadas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(jornadaConfig),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Error al guardar');
+      showAlert("Configuración de jornadas actualizada", { type: "success" });
+    } catch (err: any) {
+      showAlert(err.message || "Error al guardar jornadas", { type: "error" });
+    } finally {
+      setIsJornadaSaving(false);
+    }
+  };
+
   const handleSaveDevice = async () => {
     if (!deviceAlumnoId) return showAlert("Selecciona un alumno.", { type: "info" });
     setIsSavingDevice(true);
@@ -279,6 +323,7 @@ export function AdminPanel() {
     loadRecompensas();
     loadDeviceConfig();
     loadMenuAcciones();
+    loadJornadaConfig();
   }, []);
 
   const handleUpdateSettings = async () => {
@@ -459,6 +504,12 @@ export function AdminPanel() {
           className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "audio" ? "bg-white text-violet-600 shadow-md" : "text-indigo-400 hover:text-violet-500"}`}
         >
           🔊 Audio
+        </button>
+        <button
+          onClick={() => setActiveMainTab("jornadas")}
+          className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "jornadas" ? "bg-white text-orange-600 shadow-md" : "text-indigo-400 hover:text-orange-500"}`}
+        >
+          🌅 Jornadas
         </button>
         <button 
           onClick={() => setActiveMainTab("settings")}
@@ -940,6 +991,63 @@ export function AdminPanel() {
               </h3>
               <p className="text-sm text-indigo-700 font-bold">
                 Para añadir un nuevo tema, crea una migración SQL en Supabase o inserta manualmente en la tabla <code className="bg-white/50 px-1 rounded">themes</code>. El sistema detectará automáticamente las variables CSS definidas en el JSON <code className="bg-white/50 px-1 rounded">config</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeMainTab === "jornadas" && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4">
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border-2 border-orange-50">
+            <h2 className="text-2xl font-black text-gray-900 mb-2 flex items-center gap-3">
+              <div className="p-2 bg-orange-100 rounded-xl text-orange-600"><Clock size={24} /></div>
+              Configuración de Jornadas
+            </h2>
+            <p className="text-sm font-bold text-gray-500 mb-8">Define los rangos horarios para las actividades diarias. Formato: HH:MM-HH:MM</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { key: 'rango_manana', label: 'Mañana', emoji: '🌅', color: 'border-amber-100 bg-amber-50' },
+                { key: 'rango_tarde', label: 'Tarde', emoji: '☀️', color: 'border-orange-100 bg-orange-50' },
+                { key: 'rango_noche', label: 'Noche', emoji: '🌙', color: 'border-indigo-100 bg-indigo-50' },
+              ].map((j) => (
+                <div key={j.key} className={`p-6 rounded-[2rem] border-2 ${j.color} space-y-4`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{j.emoji}</span>
+                    <span className="font-black text-gray-800 uppercase tracking-widest text-xs">{j.label}</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={(jornadaConfig as any)[j.key]}
+                    onChange={(e) => setJornadaConfig({ ...jornadaConfig, [j.key]: e.target.value })}
+                    placeholder="00:00-00:00"
+                    className="w-full p-4 rounded-2xl border-2 border-transparent focus:border-white bg-white/50 text-center font-black text-gray-700 outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-8 flex justify-end">
+              <button
+                onClick={handleSaveJornadaConfig}
+                disabled={isJornadaSaving}
+                className="px-8 py-4 bg-gray-900 text-white rounded-2xl font-black shadow-xl hover:bg-black transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                {isJornadaSaving ? <Loader2 className="animate-spin" /> : <Save size={20} />}
+                Guardar Configuración
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 bg-blue-50 border-2 border-dashed border-blue-100 rounded-[2rem] flex items-start gap-4">
+            <div className="p-2 bg-white rounded-xl text-blue-500 shadow-sm"><Info size={20} /></div>
+            <div className="space-y-1">
+              <p className="font-black text-blue-900 text-sm">Información Importante</p>
+              <p className="text-xs font-bold text-blue-700/70 leading-relaxed">
+                Los alumnos solo verán las actividades programadas dentro del rango horario actual. 
+                Si una actividad está fuera de rango, no aparecerá en su lista de tareas.
+                Las tareas marcadas como "Flexibles" seguirán apareciendo en cualquier horario.
               </p>
             </div>
           </div>

@@ -147,7 +147,8 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
     tareasPendientes,
     evaluacionesSemanales,
     dbTasksCache,
-    dailyLevel,
+    jornadasMedals,
+    activeJornada,
     isSyncingGamification,
     recompensasDelDia,
     activatingRecompensaId,
@@ -159,6 +160,10 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
     handleActivarRecompensa,
     handleCardClick,
   } = useStudentPlan(plan, onStartModule);
+
+  // dailyLevel: compatibilidad con el RewardCard que usa el sistema antiguo de niveles
+  // Se deriva del conteo de medallas de jornada obtenidas (0 a 3)
+  const dailyLevel = (jornadasMedals.manana ? 1 : 0) + (jornadasMedals.tarde ? 1 : 0) + (jornadasMedals.noche ? 1 : 0);
 
   const [onlyPending, setOnlyPending] = useState(false);
 
@@ -194,14 +199,29 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
             </div>
             <p className="text-[10px] font-black uppercase tracking-widest text-emerald-500 mb-3">Puntos Aprobados</p>
 
-            <div className="flex justify-center gap-1.5 border-t border-emerald-200/50 pt-3">
-              <Medal size={24} className={`transition-all duration-500 ${dailyLevel >= 1 ? "text-slate-400 drop-shadow-sm scale-110" : "text-emerald-200 opacity-20"}`} />
-              <Medal size={24} className={`transition-all duration-500 ${dailyLevel >= 2 ? "text-amber-500 drop-shadow-sm scale-110" : "text-emerald-200 opacity-20"}`} />
-              <Trophy size={24} className={`transition-all duration-500 ${dailyLevel >= 3 ? "text-amber-600 drop-shadow-md scale-125 animate-bounce" : "text-emerald-200 opacity-20"}`} />
+            <div className="flex justify-center gap-4 border-t border-emerald-200/50 pt-3 relative">
+              <div className="flex flex-col items-center gap-1">
+                <Medal size={28} className={`transition-all duration-500 ${jornadasMedals.manana ? "text-amber-500 drop-shadow-md scale-110" : "text-emerald-200 opacity-20"}`} />
+                <span className="text-[8px] font-black uppercase text-emerald-600">Mañana</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <Medal size={28} className={`transition-all duration-500 ${jornadasMedals.tarde ? "text-amber-500 drop-shadow-md scale-110" : "text-emerald-200 opacity-20"}`} />
+                <span className="text-[8px] font-black uppercase text-emerald-600">Tarde</span>
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <Trophy size={28} className={`transition-all duration-500 ${jornadasMedals.noche ? "text-amber-600 drop-shadow-md scale-110" : "text-emerald-200 opacity-20"}`} />
+                <span className="text-[8px] font-black uppercase text-emerald-600">Noche</span>
+              </div>
+
+              <div className="absolute -top-2 right-0 bg-white shadow-sm border border-emerald-100 rounded-full px-2 py-0.5 flex items-center gap-1">
+                <Clock size={10} className="text-emerald-500" />
+                <span className="text-[8px] font-black uppercase text-emerald-600">{activeJornada}</span>
+              </div>
             </div>
-            {dailyLevel > 0 && (
-              <p className="text-[10px] font-black text-emerald-600 mt-2 animate-pulse">
-                {dailyLevel === 3 ? "¡DÍA PERFECTO! 🏆" : dailyLevel === 2 ? "¡LOGRO ORO! 🥇" : "¡LOGRO PLATA! 🥈"}
+            
+            {(jornadasMedals.manana || jornadasMedals.tarde || jornadasMedals.noche) && (
+              <p className="text-[10px] font-black text-emerald-600 mt-2 animate-pulse uppercase tracking-wider">
+                ¡Medalla lograda! 🎖️
               </p>
             )}
           </div>
@@ -254,7 +274,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
                   isActivated={activatedRecompensas.has(rd.id)}
                   isActivating={activatingRecompensaId === rd.id}
                   onActivar={handleActivarRecompensa}
-                  newlyUnlocked={newlyUnlockedNivel >= rd.nivel_requerido && !activatedRecompensas.has(rd.id)}
+                  newlyUnlocked={!!(newlyUnlockedNivel && newlyUnlockedNivel.id) && newlyUnlockedNivel.id >= rd.nivel_requerido?.toString() && !activatedRecompensas.has(rd.id)}
                 />
               ))}
           </div>

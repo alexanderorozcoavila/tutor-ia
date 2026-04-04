@@ -15,14 +15,15 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
   const [tareasPendientes, setTareasPendientes] = useState<TareaPlanificada[]>([]);
   const [evaluacionesSemanales, setEvaluacionesSemanales] = useState<TareaPlanificada[]>([]);
   const [dbTasksCache, setDbTasksCache] = useState<Record<string, Task>>({});
-  const [dailyLevel, setDailyLevel] = useState<number>(0);
-  const [isSyncingGamification, setIsSyncingGamification] = useState(false);
-
+  // -- Jornadas Gamification --
+  const [jornadasMedals, setJornadasMedals] = useState({ manana: false, tarde: false, noche: false });
+  const [activeJornada, setActiveJornada] = useState<"manana" | "tarde" | "noche">("manana");
+  
   // Recompensas del día
   const [recompensasDelDia, setRecompensasDelDia] = useState<(RecompensaDiaria & { recompensa?: Recompensa })[]>([]);
   const [activatingRecompensaId, setActivatingRecompensaId] = useState<string | null>(null);
   const [activatedRecompensas, setActivatedRecompensas] = useState<Set<string>>(new Set());
-  const [newlyUnlockedNivel, setNewlyUnlockedNivel] = useState<number>(0);
+  const [newlyUnlockedNivel, setNewlyUnlockedNivel] = useState<{ id: string, name: string } | null>(null);
 
   // Puntos optimistas
   const realPoints = (plan?.tareas || [])
@@ -38,21 +39,83 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
     if (!plan?.tareas) return;
 
     const today = new Date().getDay();
+    const now = new Date();
+    const h = now.getHours();
+    
+    // 1. Obtener Configuración de Jornadas (Base de Datos)
+    const config = await planService.getJornadaConfig();
+    const timeToSeconds = (t: string) => {
+      const [h, m] = t.split(':').map(Number);
+      return h * 3600 + m * 60;
+    };
+    const nowSecs = now.getHours() * 3600 + now.getMinutes() * 60;
 
-    const todaysPlanTasks = plan.tareas
+    const isTimeInRange = (range: string) => {
+      const [start, end] = range.split('-');
+      const s = timeToSeconds(start);
+      const e = timeToSeconds(end);
+      return nowSecs >= s && nowSecs <= e;
+    };
+
+    // 2. Determinar Jornada Activa
+    let currentJornada: "manana" | "tarde" | "noche" = "manana";
+    if (isTimeInRange(config.rango_tarde)) currentJornada = "tarde";
+    else if (isTimeInRange(config.rango_noche)) currentJornada = "noche";
+    else currentJornada = "manana"; // Default a mañana si no encaja (ej: madrugada)
+    
+    setActiveJornada(currentJornada);
+
+    // 3. Obtener tareas de hoy
+    const todaysTasks = plan.tareas
       .filter(t => t.dia_semana === today)
-      .sort((a: any, b: any) => a.orden_visual - b.orden_visual);
+      .sort((a: any, b: any) => (a.orden_visual || 0) - (b.orden_visual || 0));
 
-    setTareasCompletas(todaysPlanTasks.filter(t => t.estado === "completada"));
-    setTareasEnRevision(todaysPlanTasks.filter(t => t.estado === "en_revision"));
-    setTareasPendientes(todaysPlanTasks.filter(t => t.estado === "pendiente"));
+    // 4. Filtrar para visualización (Estricto por Jornada + Flexibles)
+    const getJornadaOfTask = (t: TareaPlanificada) => {
+      if (!t.hora_asignada) return null; // Flexible
+      const hr = parseInt(t.hora_asignada.split(":")[0]);
+      const min = parseInt(t.hora_asignada.split(":")[1] || "0");
+      const tSecs = hr * 3600 + min * 60;
+
+      const [mStart, mEnd] = config.rango_manana.split('-');
+      if (tSecs >= timeToSeconds(mStart) && tSecs <= timeToSeconds(mEnd)) return "manana";
+
+      const [tStart, tEnd] = config.rango_tarde.split('-');
+      if (tSecs >= timeToSeconds(tStart) && tSecs <= timeToSeconds(tEnd)) return "tarde";
+
+      return "noche";
+    };
+
+    const tasksToShow = todaysTasks.filter(t => {
+      const taskJ = getJornadaOfTask(t);
+      return taskJ === null || taskJ === currentJornada;
+    });
+
+    setTareasCompletas(tasksToShow.filter(t => t.estado === "completada"));
+    setTareasEnRevision(tasksToShow.filter(t => t.estado === "en_revision"));
+    setTareasPendientes(tasksToShow.filter(t => t.estado === "pendiente"));
+
+    // 4. Calcular Medallas (Sobre todas las de hoy, agrupadas)
+    const checkJornadas = (allTodayTasks: TareaPlanificada[]) => {
+      const mTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "manana" || j === null; });
+      const tTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "tarde" || j === null; });
+      const nTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "noche" || j === null; });
+
+      return {
+        manana: mTasks.length > 0 && mTasks.every(t => t.estado === "completada"),
+        tarde: tTasks.length > 0 && tTasks.every(t => t.estado === "completada"),
+        noche: nTasks.length > 0 && nTasks.every(t => t.estado === "completada")
+      };
+    };
+
+    setJornadasMedals(checkJornadas(todaysTasks));
 
     const weekEvaluations = plan.tareas
       .filter(t => t.tipo_modulo === "assessment")
       .sort((a: any, b: any) => (a.orden_visual || 0) - (b.orden_visual || 0));
     setEvaluacionesSemanales(weekEvaluations);
 
-    const allModuleIds = [...new Set([...todaysPlanTasks, ...weekEvaluations].map(t => t.modulo_id))];
+    const allModuleIds = [...new Set([...todaysTasks, ...weekEvaluations].map(t => t.modulo_id))];
     if (allModuleIds.length > 0) {
       try {
         const rawTasks = await taskService.getTasks();
@@ -64,25 +127,8 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
       }
     }
 
-    // Historial de nivel diario
-    try {
-      const historial = await planService.getHistorialDiarioDia(plan.id!, today);
-      let currentLevel = 0;
-      if (historial) {
-        currentLevel = historial.nivel_alcanzado;
-        setDailyLevel(currentLevel);
-      }
-
-      // Auto-sanación
-      const totalHoy = todaysPlanTasks.reduce((acc, t) => acc + t.puntos_valor, 0);
-      const completosHoy = todaysPlanTasks.filter(t => t.estado === "completada").reduce((acc, t) => acc + t.puntos_valor, 0);
-      if (totalHoy > 0 && completosHoy === totalHoy && currentLevel < 3 && user && plan?.id) {
-        const res = await calcularNivelDiario(plan.id, today, user.id);
-        if (res) setDailyLevel(res.nivel);
-      }
-    } catch (e) {
-      console.error("Error loading daily history:", e);
-    }
+    // Historial de nivel diario -> Now driven client-side by tasks directly (Medallas)
+    // No explicit try/catch needed since we calculate medals dynamically off todaysPlanTasks
 
     // Recompensas del día
     try {
@@ -119,28 +165,55 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
     try {
       await planService.updateEstadoTareaPlanificada(tarea.id, newState);
 
-      const today = new Date().getDay();
-      if (user && plan?.id) {
-        setIsSyncingGamification(true);
-        const result = await calcularNivelDiario(plan.id, today, user.id);
-        if (result && result.nivel > dailyLevel) {
-          const newNivel = result.nivel;
-          setDailyLevel(newNivel);
-          setNewlyUnlockedNivel(newNivel);
+      const config = await planService.getJornadaConfig();
+      const timeToSeconds = (t: string) => {
+        const [h, m] = t.split(':').map(Number);
+        return h * 3600 + m * 60;
+      };
 
-          const confetti = (await import("canvas-confetti")).default;
-          confetti({
-            particleCount: newNivel * 60,
-            spread: 70,
-            origin: { y: 0.8 },
-            colors: newNivel === 3 ? ["#fbbf24", "#f59e0b", "#10b981", "#ffffff"] : ["#34d399", "#60a5fa", "#a78bfa"],
-          });
+      const getJornadaOfTask = (t: TareaPlanificada) => {
+        if (!t.hora_asignada) return null;
+        const [hr, min] = t.hora_asignada.split(":").map(Number);
+        const tSecs = hr * 3600 + (min || 0) * 60;
 
-          // Quitar la animación de "recién desbloqueado" después de 4 segundos
-          setTimeout(() => setNewlyUnlockedNivel(0), 4000);
-        }
-        setIsSyncingGamification(false);
-      }
+        const [mStart, mEnd] = config.rango_manana.split('-');
+        if (tSecs >= timeToSeconds(mStart) && tSecs <= timeToSeconds(mEnd)) return "manana";
+
+        const [tStart, tEnd] = config.rango_tarde.split('-');
+        if (tSecs >= timeToSeconds(tStart) && tSecs <= timeToSeconds(tEnd)) return "tarde";
+
+        return "noche";
+      };
+
+      const checkJornadas = (allTodayTasks: TareaPlanificada[]) => {
+        const check = (task: TareaPlanificada) => (task.id === tarea.id ? newState === "completada" : task.estado === "completada");
+
+        const mTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "manana" || j === null; });
+        const tTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "tarde" || j === null; });
+        const nTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "noche" || j === null; });
+
+        return {
+          manana: mTasks.length > 0 && mTasks.every(check),
+          tarde: tTasks.length > 0 && tTasks.every(check),
+          noche: nTasks.length > 0 && nTasks.every(check)
+        };
+      };
+
+      const todayTasks = plan?.tareas?.filter(t => t.dia_semana === new Date().getDay()) || [];
+      const newMedals = checkJornadas(todayTasks);
+      
+      Object.keys(newMedals).forEach(k => {
+         const key = k as keyof typeof newMedals;
+         if (newMedals[key] && !jornadasMedals[key]) {
+            // New medal unlocked!
+            setNewlyUnlockedNivel({ id: key, name: `Medalla de la ${key.charAt(0).toUpperCase() + key.slice(1)}` });
+            import("canvas-confetti").then((mod) => {
+              mod.default({ particleCount: 200, spread: 70, origin: { y: 0.8 }, colors: ["#fbbf24", "#f59e0b", "#10b981", "#ffffff"] });
+            });
+            setTimeout(() => setNewlyUnlockedNivel(null), 4000);
+         }
+      });
+      setJornadasMedals(newMedals);
 
       if (newState === "completada" && plan?.id) {
         const isAchieved = await planService.checkRewardUnlock(plan.id);
@@ -228,8 +301,9 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
     tareasPendientes,
     evaluacionesSemanales,
     dbTasksCache,
-    dailyLevel,
-    isSyncingGamification,
+    jornadasMedals,
+    activeJornada,
+    isSyncingGamification: false,
     recompensasDelDia,
     activatingRecompensaId,
     activatedRecompensas,

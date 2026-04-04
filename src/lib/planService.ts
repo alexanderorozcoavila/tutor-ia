@@ -11,6 +11,7 @@ export interface TareaPlanificada {
   modulo_id: string;
   alumno_id: string;
   orden_visual: number;
+  hora_asignada?: string | null;
   metadata?: any;
   
   // Opcional, traído con JOIN
@@ -256,7 +257,15 @@ export const planService = {
     return { ...data, tareas: [] };
   },
 
-  async cloneTaskToPlan(planId: string, moduloId: string, tipoModulo: string, alumnoId: string, days: number[], puntos: number = 10) {
+  async cloneTaskToPlan(
+    planId: string, 
+    moduloId: string, 
+    tipoModulo: string, 
+    alumnoId: string, 
+    days: number[], 
+    puntos: number = 10,
+    horaAsignada: string | null = null
+  ) {
     const payload = days.map(d => ({
       plan_semanal_id: planId,
       dia_semana: d,
@@ -264,7 +273,8 @@ export const planService = {
       estado: "pendiente" as const,
       tipo_modulo: tipoModulo,
       modulo_id: moduloId,
-      alumno_id: alumnoId
+      alumno_id: alumnoId,
+      hora_asignada: horaAsignada
     }));
 
     if (LS_MODE) {
@@ -304,7 +314,8 @@ export const planService = {
       estado: "pendiente",
       tipo_modulo: "assessment",
       modulo_id: templateId,
-      alumno_id: alumnoId
+      alumno_id: alumnoId,
+      hora_asignada: null
     }]);
     if (error) throw error;
     return true;
@@ -428,6 +439,35 @@ export const planService = {
 
     const { error } = await supabase.from('plan_semanal').delete().eq('id', planId);
     if (error) throw error;
+    return true;
+  },
+
+  // 10. Gestión de Jornadas
+  async getJornadaConfig() {
+    if (LS_MODE) return { rango_manana: '00:00-11:59', rango_tarde: '12:00-17:59', rango_noche: '18:00-23:59' };
+    // Use API route when in browser (bypasses RLS via service role key on the server)
+    if (typeof window !== 'undefined') {
+      try {
+        const res = await fetch('/api/jornadas');
+        if (res.ok) return await res.json();
+      } catch (e) { /* fall through to direct query */ }
+    }
+    const { data, error } = await supabase.from('configuracion_jornadas').select('*').limit(1).maybeSingle();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data || { rango_manana: '00:00-11:59', rango_tarde: '12:00-17:59', rango_noche: '18:00-23:59' };
+  },
+
+  async updateJornadaConfig(updates: any) {
+    if (LS_MODE) return true;
+    const { data: existing } = await supabase.from('configuracion_jornadas').select('id').single();
+    
+    if (existing) {
+      const { error } = await supabase.from('configuracion_jornadas').update(updates).eq('id', existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from('configuracion_jornadas').insert([updates]);
+      if (error) throw error;
+    }
     return true;
   }
 };

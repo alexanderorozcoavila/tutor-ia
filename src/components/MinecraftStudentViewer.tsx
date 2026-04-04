@@ -29,7 +29,7 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
     tareasPendientes,
     evaluacionesSemanales,
     dbTasksCache,
-    dailyLevel,
+    jornadasMedals,
     isSyncingGamification,
     recompensasDelDia,
     activatingRecompensaId,
@@ -40,6 +40,9 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
     handleActivarRecompensa,
     handleCardClick,
   } = useStudentPlan(plan, onStartModule);
+
+  // Derivar dailyLevel a partir del conteo de medallas de jornada (0 a 3)
+  const dailyLevel = (jornadasMedals.manana ? 1 : 0) + (jornadasMedals.tarde ? 1 : 0) + (jornadasMedals.noche ? 1 : 0);
 
   const [menuItems, setMenuItems] = React.useState<MenuAccion[]>([]);
   const [executingId, setExecutingId] = React.useState<string | null>(null);
