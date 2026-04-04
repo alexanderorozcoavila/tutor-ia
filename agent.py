@@ -147,8 +147,12 @@ def abrir_kiosco_home():
     if proceso_kiosco_home is not None:
         return
     log.info(f"🏠 Iniciando App Local: {KIOSCO_HOME_URL}")
-    # FIX: path=/run... corregido para evitar la caída del motor TTS
-    cmd = f"sudo -u {USUARIO_LINUX} env DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus XDG_RUNTIME_DIR=/run/user/1000 google-chrome --autoplay-policy=no-user-gesture-required --kiosk --app={KIOSCO_HOME_URL}"
+    
+    # NUEVO: Ruta de perfil exclusivo y persistente para la app de estudio
+    perfil_kiosco = f"/home/{USUARIO_LINUX}/.config/perfil_kiosco_educativo"
+    
+    # Agregamos --user-data-dir al comando
+    cmd = f"sudo -u {USUARIO_LINUX} env DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus XDG_RUNTIME_DIR=/run/user/1000 google-chrome --user-data-dir={perfil_kiosco} --autoplay-policy=no-user-gesture-required --kiosk --app={KIOSCO_HOME_URL}"
     proceso_kiosco_home = subprocess.Popen(cmd, shell=True)
 
 
@@ -222,7 +226,7 @@ while True:
             log.warning("⚠️ Alerta: La ventana del Kiosco se cerró inesperadamente. Restaurando...")
             proceso_kiosco_home = None
             abrir_kiosco_home()
-            
+
         estado = obtener_estado()
 
         if not estado:
