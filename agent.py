@@ -144,7 +144,7 @@ def abrir_kiosco_home():
     if proceso_kiosco_home is not None:
         return
     log.info(f"🏠 Iniciando App Local: {KIOSCO_HOME_URL}")
-    cmd = f"sudo -u {USUARIO_LINUX} DISPLAY=:0 chromium-browser --kiosk --app={KIOSCO_HOME_URL}"
+    cmd = f"sudo -u {USUARIO_LINUX} env DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path/run/user/1000/bus XDG_RUNTIME_DIR=/run/user/1000 google-chrome --autoplay-policy=no-user-gesture-required --kiosk --app={KIOSCO_HOME_URL}"
     proceso_kiosco_home = subprocess.Popen(cmd, shell=True)
 
 
