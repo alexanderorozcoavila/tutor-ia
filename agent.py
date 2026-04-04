@@ -216,6 +216,13 @@ else:
 
 while True:
     try:
+        # --- NUEVO: WATCHDOG DEL KIOSCO ---
+        # Si el proceso existe, pero poll() ya no es None, significa que la ventana se cerró/murió.
+        if proceso_kiosco_home is not None and proceso_kiosco_home.poll() is not None:
+            log.warning("⚠️ Alerta: La ventana del Kiosco se cerró inesperadamente. Restaurando...")
+            proceso_kiosco_home = None
+            abrir_kiosco_home()
+            
         estado = obtener_estado()
 
         if not estado:
