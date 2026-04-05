@@ -122,10 +122,12 @@ def lanzar_recompensa(recompensa: dict) -> Optional[subprocess.Popen]:
             return None
         log.info(f"🎮 Abriendo recompensa '{nombre}': {url}")
         os.system("sudo ufw default allow outgoing > /dev/null 2>&1")
-        profile_dir = "/tmp/tutor_reward_isolated_session"
-        os.system(f"rm -rf {profile_dir} > /dev/null 2>&1")
         
-        # FIX: Homologado a google-chrome y con las variables de audio inyectadas
+        # FIX: Perfil persistente para no perder el login de Google/Netflix
+        profile_dir = f"/home/{USUARIO_LINUX}/.config/perfil_recompensa"
+        
+        # NOTA: Se eliminó la línea os.system(f"rm -rf {profile_dir}...")
+        
         entorno = "env DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus XDG_RUNTIME_DIR=/run/user/1000"
         comando = f"sudo -u {USUARIO_LINUX} {entorno} google-chrome --user-data-dir={profile_dir} --kiosk --app={url}"
         return subprocess.Popen(comando, shell=True)
@@ -161,12 +163,19 @@ def cerrar_recompensa():
     global proceso_recompensa
     if proceso_recompensa:
         log.info("🔒 Cerrando recompensa y bloqueando internet...")
+        
+        # Opcional: salir de pantalla completa si el video está maximizado
         os.system(f"sudo -u {USUARIO_LINUX} DISPLAY=:0 xdotool key Escape > /dev/null 2>&1")
         time.sleep(0.5)
-        os.system("pkill -9 -f 'tutor_reward_isolated_session' > /dev/null 2>&1")
+        
+        # FIX: Actualizado para buscar el nuevo perfil persistente
+        os.system("pkill -9 -f 'perfil_recompensa' > /dev/null 2>&1")
+        
+        # Restaurar el bloqueo de red
         os.system("sudo ufw default deny outgoing > /dev/null 2>&1")
         os.system("sudo ufw allow out to any port 443 > /dev/null 2>&1")
         os.system("sudo ufw allow out to any port 53 > /dev/null 2>&1")
+        
         proceso_recompensa = None
 
 
