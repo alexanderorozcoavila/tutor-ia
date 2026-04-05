@@ -266,9 +266,10 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
             {recompensasDelDia
               .filter((rd: any) => rd.recompensa_id) // solo las asignadas
               .sort((a: any, b: any) => a.nivel_requerido - b.nivel_requerido)
-              .map((rd: any) => {
+                .map((rd: any) => {
+                // prefer service-calculated flag; fallback to jornadasMedals
                 const jornadaKey = nivelToJornada(rd.nivel_requerido);
-                const isUnlocked = (jornadasMedals as any)[jornadaKey];
+                const isUnlocked = typeof rd.is_unlocked !== 'undefined' ? rd.is_unlocked : (jornadasMedals as any)[jornadaKey];
                 const newly = !!(newlyUnlockedNivel && newlyUnlockedNivel.id === jornadaKey && !activatedRecompensas.has(rd.id));
                 return (
                   <RewardCard

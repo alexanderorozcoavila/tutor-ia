@@ -69,6 +69,21 @@ export const taskService = {
     return data as Task[];
   },
 
+  async getTasksByIds(ids: string[]) {
+    if (!isSupabaseConfigured) {
+      const all = getLocalTasks();
+      return all.filter(t => ids.includes(t.id));
+    }
+    if (!ids || ids.length === 0) return [];
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .in('id', ids)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data as Task[];
+  },
+
   async createTask(task: Partial<Task>) {
     if (!isSupabaseConfigured) {
       const newTask: Task = {

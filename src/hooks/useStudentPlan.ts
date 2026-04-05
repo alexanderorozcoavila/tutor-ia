@@ -96,10 +96,11 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
     setTareasPendientes(tasksToShow.filter(t => t.estado === "pendiente"));
 
     // 4. Calcular Medallas (Sobre todas las de hoy, agrupadas)
+    // Only count tasks that are explicitly assigned to each jornada (ignore flexible tasks without hora_asignada)
     const checkJornadas = (allTodayTasks: TareaPlanificada[]) => {
-      const mTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "manana" || j === null; });
-      const tTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "tarde" || j === null; });
-      const nTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "noche" || j === null; });
+      const mTasks = allTodayTasks.filter(t => getJornadaOfTask(t) === "manana");
+      const tTasks = allTodayTasks.filter(t => getJornadaOfTask(t) === "tarde");
+      const nTasks = allTodayTasks.filter(t => getJornadaOfTask(t) === "noche");
 
       return {
         manana: mTasks.length > 0 && mTasks.every(t => t.estado === "completada"),
@@ -118,7 +119,7 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
     const allModuleIds = [...new Set([...todaysTasks, ...weekEvaluations].map(t => t.modulo_id))];
     if (allModuleIds.length > 0) {
       try {
-        const rawTasks = await taskService.getTasks();
+        const rawTasks = await taskService.getTasksByIds(allModuleIds.filter(Boolean));
         const map: Record<string, Task> = {};
         rawTasks.forEach(t => (map[t.id] = t));
         setDbTasksCache(map);
@@ -132,8 +133,9 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
 
     // Recompensas del día
     try {
-      const rds = await rewardService.getRecompensasDiarias(plan.id!);
-      const hoyRDs = rds.filter(rd => rd.dia_semana === today);
+      // Fetch only today's rewards with unlocked flag computed by rewardService
+      const hoyRDs = await rewardService.computeRecompensasHoy(plan.id!, today);
+      console.info('[useStudentPlan] recompensas calculadas hoy:', hoyRDs);
       setRecompensasDelDia(hoyRDs as any);
 
       // Cargar usos ya existentes desde BD → evita re-activación tras recarga de página
@@ -188,9 +190,9 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
       const checkJornadas = (allTodayTasks: TareaPlanificada[]) => {
         const check = (task: TareaPlanificada) => (task.id === tarea.id ? newState === "completada" : task.estado === "completada");
 
-        const mTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "manana" || j === null; });
-        const tTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "tarde" || j === null; });
-        const nTasks = allTodayTasks.filter(t => { const j = getJornadaOfTask(t); return j === "noche" || j === null; });
+        const mTasks = allTodayTasks.filter(t => getJornadaOfTask(t) === "manana");
+        const tTasks = allTodayTasks.filter(t => getJornadaOfTask(t) === "tarde");
+        const nTasks = allTodayTasks.filter(t => getJornadaOfTask(t) === "noche");
 
         return {
           manana: mTasks.length > 0 && mTasks.every(check),
@@ -215,18 +217,10 @@ export function useStudentPlan(plan: PlanSemanal, onStartModule: (task: Task) =>
       });
       setJornadasMedals(newMedals);
 
-      if (newState === "completada" && plan?.id) {
-        const isAchieved = await planService.checkRewardUnlock(plan.id);
-        if (isAchieved && !plan.esta_lograda) {
-          const confetti = (await import("canvas-confetti")).default;
-          confetti({
-            particleCount: 200,
-            spread: 90,
-            origin: { y: 0.6 },
-            colors: ["#34d399", "#fbbf24", "#f87171", "#60a5fa", "#a855f7"],
-          });
-        }
-      }
+      // Recompensas ahora se calculan por jornada y se manejan localmente
+      // (el efecto visual de medalla y confetti ya se dispara arriba cuando
+      // detectamos que una jornada se completó). No ejecutar lógica global
+      // basada en 'nivel' o puntos aquí para desbloquear recompensas diarias.
     } catch (err: any) {
       console.error("Error cambiando estado:", err);
       showAlert(err.message || "Error al actualizar", { type: "error" });

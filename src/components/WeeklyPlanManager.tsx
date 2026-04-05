@@ -450,32 +450,43 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
   const [recompensaDetalle, setRecompensaDetalle] = useState("");
 
   const loadPlanes = useCallback(async () => {
-    if (!user || !studentId) return;
+    console.info('[WeeklyPlanManager] loadPlanes start', { userId: user?.id, studentId });
+    if (!user || !studentId) {
+      console.info('[WeeklyPlanManager] loadPlanes aborted - missing user or studentId');
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const allPlanes = await planService.getAllPlanesSemana(studentId);
+      console.info('[WeeklyPlanManager] loadPlanes success', { count: (allPlanes || []).length });
       setPlanes(allPlanes);
     } catch (err: any) {
-      console.error(err);
+      console.error('[WeeklyPlanManager] loadPlanes error', err);
       showAlert("Error al cargar los planes semanales.", { type: "error" });
     } finally {
       setIsLoading(false);
+      console.info('[WeeklyPlanManager] loadPlanes done');
     }
   }, [user, studentId, showAlert]);
 
   const loadCatalogo = useCallback(async () => {
+    console.info('[WeeklyPlanManager] loadCatalogo start');
     try {
       const all = await rewardService.getAllRecompensas();
+      console.info('[WeeklyPlanManager] loadCatalogo success', { count: (all || []).length });
       setCatalogoRecompensas(all);
     } catch (err) {
-      console.error("Error cargando catálogo de recompensas:", err);
+      console.error('[WeeklyPlanManager] loadCatalogo error', err);
     }
   }, []);
 
   const loadRecompensasDiarias = useCallback(async (planId: string) => {
     setIsRecompensasLoading(true);
     try {
+      console.info('[WeeklyPlanManager] loadRecompensasDiarias start', { planId });
       const rds = await rewardService.getRecompensasDiarias(planId);
+      console.info('[WeeklyPlanManager] loadRecompensasDiarias success', { planId, count: (rds || []).length });
       setRecompensasDiarias(rds);
     } catch (err) {
       console.error(err);
@@ -486,20 +497,38 @@ export function WeeklyPlanManager({ studentId }: { studentId: string }) {
 
   const loadTaskCatalog = useCallback(async () => {
     try {
-      const all = await taskService.getTasks();
+      // If we have plans loaded, prefer fetching only module ids referenced by plan tasks
+      const allModuleIds = planes.flatMap(p => (p.tareas || []).map(t => t.modulo_id)).filter(Boolean);
+      console.info('[WeeklyPlanManager] loadTaskCatalog start', { moduleIdsCount: allModuleIds.length });
+      let rawTasks: Task[] = [];
+      if (allModuleIds.length > 0) {
+        rawTasks = await taskService.getTasksByIds([...new Set(allModuleIds)]);
+      } else {
+        rawTasks = await taskService.getTasks();
+      }
+      console.info('[WeeklyPlanManager] loadTaskCatalog success', { fetched: rawTasks.length });
       const map: Record<string, Task> = {};
-      all.forEach(t => (map[t.id] = t));
+      rawTasks.forEach(t => (map[t.id] = t));
       setTaskCache(map);
     } catch (err) {
       console.error("Error cargando catálogo de tareas:", err);
     }
-  }, []);
+  }, [planes]);
 
   useEffect(() => {
+    console.info('[WeeklyPlanManager] useEffect mount - invoking loaders');
     loadPlanes();
     loadCatalogo();
-    loadTaskCatalog();
-  }, [loadPlanes, loadCatalogo, loadTaskCatalog]);
+    // loadTaskCatalog will run automatically when `planes` changes
+  }, [loadPlanes, loadCatalogo]);
+
+  useEffect(() => {
+    // When planes update, refresh the task catalog
+    if ((planes || []).length > 0) {
+      console.info('[WeeklyPlanManager] planes changed - refreshing task catalog', { planesCount: planes.length });
+      loadTaskCatalog();
+    }
+  }, [planes, loadTaskCatalog]);
 
   const handleSavePlan = async () => {
     if (!user || !studentId) return;

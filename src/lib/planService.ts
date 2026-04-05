@@ -469,5 +469,50 @@ export const planService = {
       if (error) throw error;
     }
     return true;
+  },
+
+  /**
+   * Obtiene las tareas planificadas de un plan para un día específico.
+   * Si se pasa `jornadaKey` ('manana'|'tarde'|'noche'), filtra solo las tareas
+   * cuya `hora_asignada` caiga en ese rango. Las horas se resuelven contra la
+   * configuración de jornadas actual.
+   */
+  async getTareasPlanDia(planId: string, diaSemana: number, jornadaKey?: 'manana' | 'tarde' | 'noche') {
+    if (LS_MODE) {
+      const tasks = getLocalTareasPlan().filter(t => t.plan_semanal_id === planId && t.dia_semana === diaSemana);
+      if (!jornadaKey) return tasks;
+      const cfg = await this.getJornadaConfig();
+      const timeToSeconds = (t: string) => { const [h, m] = t.split(':').map(Number); return h*3600 + m*60; };
+      const [start,end] = (jornadaKey === 'manana' ? cfg.rango_manana : jornadaKey === 'tarde' ? cfg.rango_tarde : cfg.rango_noche).split('-');
+      const s = timeToSeconds(start); const e = timeToSeconds(end);
+      return tasks.filter(t => {
+        if (!t.hora_asignada) return false;
+        const [hr, min] = (t.hora_asignada || '00:00').split(':').map(Number);
+        const secs = hr*3600 + (min||0)*60;
+        return secs >= s && secs <= e;
+      });
+    }
+
+    const { data: tareas, error } = await supabase
+      .from('tarea_planificada')
+      .select('*')
+      .eq('plan_semanal_id', planId)
+      .eq('dia_semana', diaSemana);
+    if (error) throw error;
+
+    if (!jornadaKey) return tareas || [];
+
+    const cfg = await this.getJornadaConfig();
+    const timeToSeconds = (t: string) => { const [h, m] = t.split(':').map(Number); return h*3600 + m*60; };
+    const range = jornadaKey === 'manana' ? cfg.rango_manana : jornadaKey === 'tarde' ? cfg.rango_tarde : cfg.rango_noche;
+    const [start, end] = range.split('-');
+    const s = timeToSeconds(start); const e = timeToSeconds(end);
+
+    return (tareas || []).filter((t: any) => {
+      if (!t.hora_asignada) return false;
+      const [hr, min] = (t.hora_asignada || '00:00').split(':').map(Number);
+      const secs = hr*3600 + (min||0)*60;
+      return secs >= s && secs <= e;
+    });
   }
 };

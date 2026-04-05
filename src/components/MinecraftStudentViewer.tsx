@@ -278,7 +278,7 @@ export function MinecraftStudentViewer({ plan, onRefreshFallback, onStartModule 
                 {recompensasDelDia
                   .filter(rd => rd.recompensa_id)
                   .map(rd => {
-                    const ok = dailyLevel >= rd.nivel_requerido;
+                    const ok = (rd as any).is_unlocked !== undefined ? (rd as any).is_unlocked : (dailyLevel >= rd.nivel_requerido);
                     const used = activatedRecompensas.has(rd.id);
                     return (
                       <button 

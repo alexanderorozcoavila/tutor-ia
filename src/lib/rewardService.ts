@@ -22,7 +22,7 @@ export interface RecompensaDiaria {
   plan_semanal_id: string;
   recompensa_id?: string;
   dia_semana: number;        // 0=Dom, 1=Lun...6=Sab
-  nivel_requerido: number;   // 1=80%, 2=90%, 3=100%
+  nivel_requerido: number;   // repurposed as jornada id: 1=mañana,2=tarde,3=noche
   minutos_disponibles: number;
   created_at: string;
   // JOIN opcional
@@ -125,14 +125,79 @@ export const rewardService = {
    */
   async getRecompensasDiarias(planId: string): Promise<RecompensaDiaria[]> {
     if (LS_MODE) return [];
+    // Backwards-compatible: if second arg provided, filter by dia_semana
+    const query = supabase
+      .from('recompensa_diaria')
+      .select('*, recompensa:recompensas(*)')
+      .eq('plan_semanal_id', planId);
+    const { data, error } = await query.order('dia_semana').order('nivel_requerido');
+    if (error) throw error;
+    return data || [];
+  },
+
+  async getRecompensasDiariasPorDia(planId: string, diaSemana: number): Promise<RecompensaDiaria[]> {
+    if (LS_MODE) return [];
     const { data, error } = await supabase
       .from('recompensa_diaria')
       .select('*, recompensa:recompensas(*)')
       .eq('plan_semanal_id', planId)
-      .order('dia_semana')
+      .eq('dia_semana', diaSemana)
       .order('nivel_requerido');
     if (error) throw error;
     return data || [];
+  },
+
+  /**
+   * Calcula si cada recompensa del día está desbloqueada según el cumplimiento
+   * de la jornada correspondiente. Retorna objetos con `is_unlocked` y detalles
+   * para logging y depuración.
+   */
+  async computeRecompensasHoy(planId: string, diaSemana: number) {
+    if (LS_MODE) return [];
+    console.info(`[rewardService] computeRecompensasHoy plan=${planId} dia=${diaSemana}`);
+    // 1) Obtener recompensas asignadas para hoy
+    const rds = await this.getRecompensasDiariasPorDia(planId, diaSemana);
+    console.info(`[rewardService] recompensas hoy count=${rds.length}`);
+
+    // 2) Obtener tareas del plan para hoy
+    const { data: tareas } = await supabase
+      .from('tarea_planificada')
+      .select('id, estado, hora_asignada, puntos_valor')
+      .eq('plan_semanal_id', planId)
+      .eq('dia_semana', diaSemana);
+
+    const cfg = await (await import('./planService')).planService.getJornadaConfig();
+    const timeToSeconds = (t: string) => { const [h,m] = t.split(':').map(Number); return h*3600 + m*60; };
+
+    const getJornadaOfTask = (t: any) => {
+      if (!t.hora_asignada) return null;
+      const [hr, min] = (t.hora_asignada || '00:00').split(':').map(Number);
+      const secs = hr*3600 + (min||0)*60;
+      const [mStart, mEnd] = cfg.rango_manana.split('-');
+      if (secs >= timeToSeconds(mStart) && secs <= timeToSeconds(mEnd)) return 'manana';
+      const [tStart, tEnd] = cfg.rango_tarde.split('-');
+      if (secs >= timeToSeconds(tStart) && secs <= timeToSeconds(tEnd)) return 'tarde';
+      return 'noche';
+    };
+
+    const tasksByJornada: Record<string, any[]> = {manana: [], tarde: [], noche: []};
+    (tareas || []).forEach(t => {
+      const j = getJornadaOfTask(t);
+      if (j) tasksByJornada[j].push(t);
+    });
+
+    Object.entries(tasksByJornada).forEach(([k, arr]) => console.info(`[rewardService] jornada=${k} tasks=${arr.length}`));
+
+    // 3) Para cada recompensa asignada hoy, calcular si su jornada está completada
+    const mapped = (rds || []).map(rd => {
+      const jornadaKey = rd.nivel_requerido === 1 ? 'manana' : rd.nivel_requerido === 2 ? 'tarde' : 'noche';
+      const tasks = tasksByJornada[jornadaKey] || [];
+      const unlocked = tasks.length > 0 && tasks.every((t: any) => t.estado === 'completada');
+      console.info(`[rewardService] rd=${rd.id} jornada=${jornadaKey} tasks=${tasks.length} completed=${tasks.filter((t:any)=>t.estado==='completada').length} unlocked=${unlocked}`);
+      return { ...rd, is_unlocked: unlocked } as any;
+    });
+
+    return mapped;
   },
 
   /**
