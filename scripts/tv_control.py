@@ -200,7 +200,7 @@ def send_warning(ip: str, message: str) -> bool:
     Aparece en pantalla durante ~10 segundos en la esquina superior derecha.
     """
     try:
-        tv = SamsungTVWS(host=ip, port=8002, timeout=5, token_file=TOKEN_PATH)
+        tv = SamsungTVWS(host=ip, port=8002, timeout=5, name='IAtutor', token_file=TOKEN_PATH)
         tv.open()
         tv.send_broadcast(message)
         tv.close()
@@ -213,7 +213,7 @@ def send_warning(ip: str, message: str) -> bool:
 def send_power_off(ip: str) -> bool:
     """Envía comando de apagado por WebSocket (puerto 8002) al Samsung TV."""
     try:
-        tv = SamsungTVWS(host=ip, port=8002, timeout=5, token_file=TOKEN_PATH)
+        tv = SamsungTVWS(host=ip, port=8002, timeout=5, name='IAtutor', token_file=TOKEN_PATH)
         tv.open()
         tv.shortcuts().power()
         tv.close()
