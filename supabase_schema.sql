@@ -160,3 +160,22 @@ CREATE POLICY "Permitir todo a plantillas" ON assessment_templates FOR ALL USING
 INSERT INTO system_settings (attention_message) 
 VALUES ('¡Hola! ¿Cómo vas? Sigamos juntos.')
 ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- 15. Control Parental Smart TV — tabla tv_config por alumno
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tv_config (
+  id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  student_id            UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_ip             TEXT NOT NULL DEFAULT '192.168.1.100',
+  force_power_off       BOOLEAN NOT NULL DEFAULT FALSE,   -- Prioridad 1: apagado manual inmediato
+  restricted_start_time TIME,                              -- Prioridad 2: hora inicio del bloqueo
+  restricted_end_time   TIME,                              -- Prioridad 2: hora fin del bloqueo
+  is_active             BOOLEAN NOT NULL DEFAULT TRUE,    -- Master switch ON/OFF
+  updated_at            TIMESTAMPTZ DEFAULT now(),
+  updated_by            UUID REFERENCES users(id) ON DELETE SET NULL,
+  CONSTRAINT one_config_per_student UNIQUE (student_id)
+);
+
+ALTER TABLE tv_config ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Permitir todo en tv_config" ON tv_config FOR ALL USING (true);

@@ -107,3 +107,73 @@ export const settingsService = {
     }
   }
 };
+
+// ============================================================
+// Control Parental Smart TV
+// ============================================================
+
+export interface TvConfig {
+  id?: string;
+  student_id: string;
+  device_ip: string;
+  force_power_off: boolean;
+  restricted_start_time: string | null; // "HH:MM:SS"
+  restricted_end_time: string | null;   // "HH:MM:SS"
+  is_active: boolean;
+  updated_at?: string;
+  updated_by?: string;
+}
+
+const TV_CONFIG_LS_KEY = 'ia_tutor_tv_config';
+
+export const tvConfigService = {
+  /** Lee la configuración de TV de un alumno específico */
+  async getConfigByStudent(studentId: string): Promise<TvConfig | null> {
+    if (!isSupabaseConfigured) {
+      const saved = localStorage.getItem(`${TV_CONFIG_LS_KEY}_${studentId}`);
+      return saved ? JSON.parse(saved) : null;
+    }
+
+    const { data, error } = await supabase
+      .from('tv_config')
+      .select('*')
+      .eq('student_id', studentId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[tvConfigService] getConfigByStudent error:', error);
+      return null;
+    }
+    return data as TvConfig | null;
+  },
+
+  /** Crea o actualiza la configuración de TV de un alumno (upsert por student_id) */
+  async upsertConfig(
+    config: Partial<TvConfig> & { student_id: string }
+  ): Promise<TvConfig> {
+    const payload = {
+      ...config,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (!isSupabaseConfigured) {
+      const existing = await this.getConfigByStudent(config.student_id);
+      const updated = { ...existing, ...payload } as TvConfig;
+      localStorage.setItem(
+        `${TV_CONFIG_LS_KEY}_${config.student_id}`,
+        JSON.stringify(updated)
+      );
+      return updated;
+    }
+
+    const { data, error } = await supabase
+      .from('tv_config')
+      .upsert([payload], { onConflict: 'student_id' })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data as TvConfig;
+  },
+};
+

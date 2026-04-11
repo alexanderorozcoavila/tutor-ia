@@ -6,11 +6,12 @@ import { settingsService } from "@/lib/settingsService";
 import { lmsService, Subject } from "@/lib/lmsService";
 import { rewardService, Recompensa } from "@/lib/rewardService";
 
-import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon, Monitor, UserCheck, Clock, Info } from "lucide-react";
+import { UserPlus, Settings, Database, Key, ShieldCheck, Loader2, Trash2, AlertTriangle, MessageSquare, Save, BookA, CheckSquare, X, Star, Plus, Pencil, Gift, Link, Terminal, Image as ImageIcon, Monitor, UserCheck, Clock, Info, Tv } from "lucide-react";
 import { systemMenuService, MenuAccionCompleta } from "@/lib/systemMenuService";
 import { Modal } from "./Modal";
 import { AudioDiagnosticsPanel } from "./AudioDiagnosticsPanel";
 import { useAlert } from "@/lib/AlertContext";
+import TvControlPanel from "./TvControlPanel";
 
 export function AdminPanel() {
   const { showAlert } = useAlert();
@@ -20,7 +21,8 @@ export function AdminPanel() {
   const [newPassword, setNewPassword] = useState("");
   const [newRole, setNewRole] = useState<"tutor" | "admin">("tutor");
   const [isCreating, setIsCreating] = useState(false);
-  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "menu" | "audio" | "jornadas" | "settings">("users");
+  const [activeMainTab, setActiveMainTab] = useState<"users" | "themes" | "rewards" | "menu" | "audio" | "jornadas" | "settings" | "smarttv">("users");
+  const [expandedTvStudentId, setExpandedTvStudentId] = useState<string | null>(null);
   const [themes, setThemes] = useState<any[]>([]);
   const [isThemesLoading, setIsThemesLoading] = useState(false);
 
@@ -524,6 +526,12 @@ export function AdminPanel() {
           className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "settings" ? "bg-white text-indigo-600 shadow-md" : "text-indigo-400 hover:text-indigo-600"}`}
         >
           Configuración
+        </button>
+        <button
+          onClick={() => setActiveMainTab("smarttv")}
+          className={`flex-1 py-3 rounded-2xl font-black transition-all text-sm ${activeMainTab === "smarttv" ? "bg-white text-red-600 shadow-md" : "text-indigo-400 hover:text-red-500"}`}
+        >
+          📺 Smart TV
         </button>
       </div>
 
@@ -1502,6 +1510,88 @@ export function AdminPanel() {
           </button>
         </div>
       </Modal>
+
+      {/* ──────── PESTAÑA SMART TV ──────── */}
+      {activeMainTab === "smarttv" && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+          <div className="bg-white p-8 rounded-[2.5rem] shadow-lg border-2 border-red-50">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="p-3 bg-red-100 text-red-600 rounded-2xl">
+                <Tv size={28} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-gray-900">Control Parental Smart TV</h2>
+                <p className="text-gray-500 font-medium text-sm mt-0.5">
+                  Configura el horario de bloqueo y el apagado manual del televisor por alumno.
+                </p>
+              </div>
+            </div>
+
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12 text-gray-400 gap-3">
+                <Loader2 className="animate-spin" size={24} />
+                <span>Cargando alumnos...</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {users.filter(u => u.role === "student").length === 0 ? (
+                  <div className="text-center p-12 bg-red-50 rounded-[2rem] border-2 border-dashed border-red-100">
+                    <div className="text-5xl mb-3">📺</div>
+                    <p className="font-black text-red-600">No hay alumnos registrados.</p>
+                    <p className="text-sm font-bold text-red-400 mt-1">
+                      Crea alumnos desde la pestaña Usuarios para configurar su Smart TV.
+                    </p>
+                  </div>
+                ) : (
+                  users.filter(u => u.role === "student").map(student => (
+                    <div key={student.id} className="rounded-2xl border border-gray-100 overflow-hidden">
+                      {/* Fila del alumno */}
+                      <div className="flex items-center justify-between px-6 py-4 bg-gray-50 hover:bg-gray-100/70 transition">
+                        <div className="flex items-center gap-3">
+                          <div className="w-9 h-9 bg-indigo-100 rounded-xl flex items-center justify-center text-indigo-600 font-black text-sm">
+                            {student.username.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-gray-800">{student.username}</p>
+                            <p className="text-xs text-gray-400 uppercase tracking-widest">Alumno</p>
+                          </div>
+                        </div>
+                        <button
+                          id={`admin-tv-config-${student.id}`}
+                          onClick={() =>
+                            setExpandedTvStudentId(prev =>
+                              prev === student.id ? null : student.id
+                            )
+                          }
+                          className={`flex items-center gap-2 text-sm font-bold px-4 py-2 rounded-xl transition ${
+                            expandedTvStudentId === student.id
+                              ? "bg-red-600 text-white shadow-md"
+                              : "bg-red-50 text-red-600 hover:bg-red-100"
+                          }`}
+                        >
+                          <Tv size={15} />
+                          {expandedTvStudentId === student.id ? "Cerrar" : "Configurar TV"}
+                        </button>
+                      </div>
+
+                      {/* Panel expandible */}
+                      {expandedTvStudentId === student.id && (
+                        <div className="px-6 pb-6 bg-white">
+                          <TvControlPanel
+                            studentId={student.id}
+                            studentName={student.username}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
