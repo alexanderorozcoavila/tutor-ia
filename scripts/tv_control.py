@@ -11,6 +11,8 @@ Variables de entorno (~/.env):
   SUPABASE_SERVICE_ROLE_KEY → valor de SUPABASE_SERVICE_ROLE_KEY del proyecto
   STUDENT_ID                → UUID del alumno a monitorear
   POLL_INTERVAL_SECONDS     → intervalo de consulta (default: 45)
+  WEBAPP_URL                → URL de la app Next.js accesible desde la TV
+                               (ej: http://192.168.1.86:3000)
 """
 
 import os
@@ -36,6 +38,9 @@ SUPABASE_URL: str = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 STUDENT_ID: str   = os.environ.get("STUDENT_ID", "")
 POLL_INTERVAL: int = int(os.environ.get("POLL_INTERVAL_SECONDS", "45"))
+
+# URL de la webapp Next.js accesible desde la red local (para mostrar alertas en la TV)
+WEBAPP_URL: str = os.environ.get("WEBAPP_URL", "http://192.168.1.86:3000").rstrip("/")
 
 # Ruta absoluta para el token de autorización (evita pedir permiso cada vez)
 TOKEN_PATH = os.path.expanduser("~/tv_token.txt")
@@ -194,15 +199,18 @@ def is_tv_on(ip: str) -> bool:
         return False
 
 
-def send_warning(ip: str, message: str) -> bool:
+def send_warning(ip: str, message: str, minutes: int) -> bool:
     """
-    Envía una notificación Toast a la Samsung TV usando send_broadcast.
-    Aparece en pantalla durante ~10 segundos en la esquina superior derecha.
+    Abre el navegador de la Samsung TV con la página de advertencia.
+    Usa tv.open_browser() que es la API real de samsungtvws.
+    La página se sirve desde el endpoint /api/tv-warning de Next.js.
     """
     try:
+        from urllib.parse import quote
+        warning_url = f"{WEBAPP_URL}/api/tv-warning?msg={quote(message)}&min={minutes}"
         tv = SamsungTVWS(host=ip, port=8002, timeout=5, name='IAtutor', token_file=TOKEN_PATH)
         tv.open()
-        tv.send_broadcast(message)
+        tv.open_browser(warning_url)
         tv.close()
         return True
     except Exception as e:
@@ -249,7 +257,7 @@ def main() -> None:
                     msg  = config.get("warning_message", "¡La TV se apagará pronto!")
                     mins = config.get("warning_minutes_before", 5)
                     if is_tv_on(ip):
-                        ok = send_warning(ip, msg)
+                        ok = send_warning(ip, msg, mins)
                         if ok:
                             log.info(f"🔔 Alerta enviada a {ip} ({mins} min antes): {msg!r}")
                             _warning_sent_for_start = config.get("restricted_start_time")

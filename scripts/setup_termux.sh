@@ -41,6 +41,9 @@ STUDENT_ID=2e613db4-5768-4022-9e0f-6bc26ff2df35
 
 # Intervalo de consulta en segundos (mínimo 30, recomendado 45)
 POLL_INTERVAL_SECONDS=20
+
+# URL de la app Next.js accesible desde la TV (para mostrar alertas en pantalla)
+WEBAPP_URL=http://192.168.1.86:3000
 EOF
   echo "   ✅ Archivo creado en $ENV_FILE"
   echo "   ⚠  EDITA el archivo y completa SUPABASE_KEY y STUDENT_ID antes de continuar."

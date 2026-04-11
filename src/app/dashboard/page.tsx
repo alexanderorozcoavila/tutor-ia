@@ -3,20 +3,12 @@
 import { useSession } from "@/components/SessionProvider";
 import { getTutorDashboardData } from "@/actions/studentActions";
 import { useEffect, useState } from "react";
-import { User, Trophy, Clock, AlertCircle, Tv } from "lucide-react";
-import TvControlPanel from "@/components/TvControlPanel";
+import { User, Trophy, Clock, AlertCircle } from "lucide-react";
 
 export default function DashboardPage() {
-  const { xp, user } = useSession();
+  const { xp } = useSession();
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
-
-  const isAdmin = (user as any)?.role === 'admin';
-
-  const toggleTvPanel = (studentId: string) => {
-    setExpandedStudentId(prev => (prev === studentId ? null : studentId));
-  };
 
   useEffect(() => {
     getTutorDashboardData()
@@ -78,7 +70,7 @@ export default function DashboardPage() {
                  <th className="px-8 py-4 text-gray-500 font-medium italic">Nombre</th>
                  <th className="px-8 py-4 text-gray-500 font-medium italic">Preferencia</th>
                  <th className="px-8 py-4 text-gray-500 font-medium italic">XP</th>
-                 <th className="px-8 py-4 text-gray-200 font-medium italic">{isAdmin ? 'TV' : '...'}</th>
+                 <th className="px-8 py-4 text-gray-200 font-medium italic">...</th>
                </tr>
              </thead>
              <tbody>
@@ -88,41 +80,12 @@ export default function DashboardPage() {
                  </tr>
                ) : students.length > 0 ? (
                  students.map(s => (
-                   <>
-                     <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition">
-                       <td className="px-8 py-5 font-bold text-gray-800">{s.name || s.username}</td>
-                       <td className="px-8 py-5 text-gray-600">{s.theme_preference || '—'}</td>
-                       <td className="px-8 py-5 text-indigo-600 font-black">{s.xp_points ?? 0} XP</td>
-                       <td className="px-8 py-5">
-                         {isAdmin ? (
-                           <button
-                             id={`btn-tv-config-${s.id}`}
-                             onClick={() => toggleTvPanel(s.id)}
-                             className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition ${
-                               expandedStudentId === s.id
-                                 ? 'bg-indigo-600 text-white'
-                                 : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
-                             }`}
-                           >
-                             <Tv size={13} />
-                             {expandedStudentId === s.id ? 'Cerrar' : 'Config TV'}
-                           </button>
-                         ) : (
-                           <span className="text-gray-400">Ver más</span>
-                         )}
-                       </td>
-                     </tr>
-                     {isAdmin && expandedStudentId === s.id && (
-                       <tr key={`${s.id}-tv`}>
-                         <td colSpan={4} className="px-8 pb-6">
-                           <TvControlPanel
-                             studentId={s.id}
-                             studentName={s.name || s.username}
-                           />
-                         </td>
-                       </tr>
-                     )}
-                   </>
+                   <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition">
+                     <td className="px-8 py-5 font-bold text-gray-800">{s.name}</td>
+                     <td className="px-8 py-5 text-gray-600">{s.theme_preference}</td>
+                     <td className="px-8 py-5 text-indigo-600 font-black">{s.xp_points} XP</td>
+                     <td className="px-8 py-5 text-gray-400">Ver más</td>
+                   </tr>
                  ))
                ) : (
                  <tr>
@@ -136,6 +99,5 @@ export default function DashboardPage() {
         </div>
       </section>
     </div>
-
   );
 }
