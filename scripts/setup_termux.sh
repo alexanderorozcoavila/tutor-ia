@@ -18,7 +18,7 @@ pkg install -y python python-pip
 # ── 2. Dependencias Python ─────────────────────────────────
 echo ""
 echo "🐍 Instalando librerías Python..."
-pip install --upgrade pip
+#---pip install --upgrade pip
 pip install supabase samsungtvws python-dotenv
 
 # ── 3. Crear archivo de variables de entorno ───────────────
