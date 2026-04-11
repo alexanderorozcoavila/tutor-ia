@@ -37,6 +37,9 @@ SUPABASE_KEY: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 STUDENT_ID: str   = os.environ.get("STUDENT_ID", "")
 POLL_INTERVAL: int = int(os.environ.get("POLL_INTERVAL_SECONDS", "45"))
 
+# Ruta absoluta para el token de autorización (evita pedir permiso cada vez)
+TOKEN_PATH = os.path.expanduser("~/tv_token.txt")
+
 if not all([SUPABASE_URL, SUPABASE_KEY, STUDENT_ID]):
     raise SystemExit(
         "❌ Faltan variables de entorno.\n"
@@ -197,7 +200,7 @@ def send_warning(ip: str, message: str) -> bool:
     Aparece en pantalla durante ~10 segundos en la esquina superior derecha.
     """
     try:
-        tv = SamsungTVWS(host=ip, port=8002, timeout=5)
+        tv = SamsungTVWS(host=ip, port=8002, timeout=5, token_file=TOKEN_PATH)
         tv.open()
         tv.send_broadcast(message)
         tv.close()
@@ -210,7 +213,7 @@ def send_warning(ip: str, message: str) -> bool:
 def send_power_off(ip: str) -> bool:
     """Envía comando de apagado por WebSocket (puerto 8002) al Samsung TV."""
     try:
-        tv = SamsungTVWS(host=ip, port=8002, timeout=5)
+        tv = SamsungTVWS(host=ip, port=8002, timeout=5, token_file=TOKEN_PATH)
         tv.open()
         tv.shortcuts().power()
         tv.close()
