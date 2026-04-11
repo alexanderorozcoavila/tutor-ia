@@ -319,7 +319,7 @@ function StudentTvConfig({
 function ToggleCard({
   icon, label, sublabel, value, onChange, accent,
 }: {
-  icon: JSX.Element; label: string; sublabel: string; value: boolean; onChange: (v: boolean) => void; accent: 'indigo'|'red'
+  icon: React.ReactNode; label: string; sublabel: string; value: boolean; onChange: (v: boolean) => void; accent: 'indigo'|'red'
 }) {
   const bg = value ? (accent === 'red' ? 'bg-red-500/10 border-red-500' : 'bg-indigo-500/10 border-indigo-500') : 'bg-white/5 border-transparent';
   return (
