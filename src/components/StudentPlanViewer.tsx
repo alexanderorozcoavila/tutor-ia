@@ -19,9 +19,9 @@ interface Props {
 
 // ─── Etiqueta de nivel ────────────────────────────────────────────────────────
 const NIVEL_CONFIG = [
-  { nivel: 1, label: "80%",  emoji: "🥈", color: "from-slate-300 to-slate-400",   border: "border-slate-300",   text: "text-slate-600",  bg: "bg-slate-50",  unlockBg: "bg-slate-100" },
-  { nivel: 2, label: "90%",  emoji: "🥇", color: "from-amber-400 to-yellow-400",  border: "border-amber-300",   text: "text-amber-700",  bg: "bg-amber-50",  unlockBg: "bg-amber-100" },
-  { nivel: 3, label: "100%", emoji: "🏆", color: "from-emerald-400 to-teal-500",  border: "border-emerald-300", text: "text-emerald-700", bg: "bg-emerald-50", unlockBg: "bg-emerald-100" },
+  { nivel: 1, label: "80%", emoji: "🥈", color: "from-slate-300 to-slate-400", border: "border-slate-300", text: "text-slate-600", bg: "bg-slate-50", unlockBg: "bg-slate-100" },
+  { nivel: 2, label: "90%", emoji: "🥇", color: "from-amber-400 to-yellow-400", border: "border-amber-300", text: "text-amber-700", bg: "bg-amber-50", unlockBg: "bg-amber-100" },
+  { nivel: 3, label: "100%", emoji: "🏆", color: "from-emerald-400 to-teal-500", border: "border-emerald-300", text: "text-emerald-700", bg: "bg-emerald-50", unlockBg: "bg-emerald-100" },
 ];
 
 // ─── Componente tarjeta de recompensa ─────────────────────────────────────────
@@ -84,7 +84,7 @@ function RewardCard({ rd, isUnlocked, isActivated, isActivating, onActivar, newl
 
         {/* Info */}
         <div className="flex-1 min-w-0">
-            {isUnlocked ? (
+          {isUnlocked ? (
             <>
               <p className={`font-black text-base leading-tight ${cfg.text}`}>{rInfo?.nombre || "Recompensa"}</p>
               <p className="text-xs font-bold text-gray-400 mt-0.5 flex items-center gap-1">
@@ -107,7 +107,7 @@ function RewardCard({ rd, isUnlocked, isActivated, isActivating, onActivar, newl
         </div>
 
         {/* Botón o estado */}
-            {isUnlocked && (
+        {isUnlocked && (
           isActivated ? (
             <div className="flex-shrink-0 flex flex-col items-center gap-1 text-center">
               <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
@@ -115,7 +115,7 @@ function RewardCard({ rd, isUnlocked, isActivated, isActivating, onActivar, newl
               </div>
               <p className="text-[9px] font-black text-emerald-600 uppercase tracking-wider">Usada hoy</p>
             </div>
-                  ) : (
+          ) : (
             <button
               onClick={() => onActivar(rd)}
               disabled={isActivating}
@@ -218,7 +218,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
                 <span className="text-[8px] font-black uppercase text-emerald-600">{activeJornada}</span>
               </div>
             </div>
-            
+
             {(jornadasMedals.manana || jornadasMedals.tarde || jornadasMedals.noche) && (
               <p className="text-[10px] font-black text-emerald-600 mt-2 animate-pulse uppercase tracking-wider">
                 ¡Medalla lograda! 🎖️
@@ -266,7 +266,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
             {recompensasDelDia
               .filter((rd: any) => rd.recompensa_id) // solo las asignadas
               .sort((a: any, b: any) => a.nivel_requerido - b.nivel_requerido)
-                .map((rd: any) => {
+              .map((rd: any) => {
                 // prefer service-calculated flag; fallback to jornadasMedals
                 const jornadaKey = nivelToJornada(rd.nivel_requerido);
                 const isUnlocked = typeof rd.is_unlocked !== 'undefined' ? rd.is_unlocked : (jornadasMedals as any)[jornadaKey];
@@ -285,31 +285,7 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
               })}
           </div>
 
-          {/* Barra de progreso hacia siguiente recompensa */}
-          {dailyLevel < 3 && (() => {
-            const nextReward = recompensasDelDia
-              .filter((rd: any) => rd.recompensa_id && rd.nivel_requerido > dailyLevel)
-              .sort((a: any, b: any) => a.nivel_requerido - b.nivel_requerido)[0];
-            if (!nextReward) return null;
-            const cfg = NIVEL_CONFIG.find(n => n.nivel === nextReward.nivel_requerido);
-            const target = nextReward.nivel_requerido === 1 ? 0.8 : nextReward.nivel_requerido === 2 ? 0.9 : 1.0;
-            const currentPct = progressPercent / 100;
-            const progress = Math.min(100, Math.round((currentPct / target) * 100));
-            return (
-              <div className="bg-white rounded-[1.5rem] border-2 border-gray-100 p-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-xs font-black text-gray-500">Progreso hacia siguiente recompensa ({cfg?.label})</span>
-                  <span className={`text-xs font-black ${cfg?.text}`}>{progress}%</span>
-                </div>
-                <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full bg-gradient-to-r ${cfg?.color} rounded-full transition-all duration-700`}
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })()}
+
         </div>
       )}
 
@@ -328,9 +304,8 @@ export function StudentPlanViewer({ plan, onRefreshFallback, onStartModule }: Pr
                   <div
                     key={evalu.id}
                     onClick={() => !isCompletada && handleCardClick(evalu)}
-                    className={`group p-6 theme-card transition-all flex items-center justify-between ${
-                      isCompletada ? "opacity-70 grayscale" : "cursor-pointer active:scale-[0.98]"
-                    }`}
+                    className={`group p-6 theme-card transition-all flex items-center justify-between ${isCompletada ? "opacity-70 grayscale" : "cursor-pointer active:scale-[0.98]"
+                      }`}
                   >
                     <div className="flex items-center gap-4">
                       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner ${isCompletada ? "bg-purple-200 text-white" : "bg-purple-50 text-purple-500"}`}>

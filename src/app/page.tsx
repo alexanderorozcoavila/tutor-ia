@@ -51,18 +51,18 @@ function AppContent() {
       if (activeTask.type === "dictation") {
         moduleTitle = "Dictado";
         moduleContent = (
-          <DictationModule 
-            taskId={activeTask.id} 
-            initialText={activeTask.metadata.dictation_text} 
+          <DictationModule
+            taskId={activeTask.id}
+            initialText={activeTask.metadata.dictation_text}
             initialConfig={activeTask.metadata.config}
-            onFinish={() => setActiveTask(null)} 
+            onFinish={() => setActiveTask(null)}
             theme={isMinecraft ? "minecraft" : undefined}
           />
         );
       } else if (activeTask.type === "reading") {
         moduleTitle = "Lectura";
         moduleContent = (
-          <ReadingModule 
+          <ReadingModule
             task={activeTask}
             onFinish={() => setActiveTask(null)}
             theme={isMinecraft ? "minecraft" : undefined}
@@ -71,7 +71,7 @@ function AppContent() {
       } else if (activeTask.type === "assessment") {
         moduleTitle = "Evaluación";
         moduleContent = (
-          <AssessmentModule 
+          <AssessmentModule
             task={activeTask}
             onFinish={() => setActiveTask(null)}
             theme={isMinecraft ? "minecraft" : undefined}
@@ -109,13 +109,13 @@ function AppContent() {
           <div className="flex items-center gap-2 text-indigo-600 font-black text-2xl">
             <Sparkles className="animate-pulse" size={28} /> IA Tutor
           </div>
-          
+
           <div className="flex items-center gap-3">
             <div className="flex flex-col items-end mr-2 bg-indigo-50/50 px-4 py-1 rounded-2xl border border-indigo-100">
               <span className="text-sm font-black text-indigo-900">{user.username}</span>
               <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-tight">{user.role}</span>
             </div>
-            <button 
+            <button
               onClick={logout}
               className="p-3 bg-red-50 text-red-500 rounded-2xl hover:bg-red-100 transition-all flex items-center gap-2 font-black text-sm shadow-sm active:scale-95"
               title="Cerrar Sesión"
