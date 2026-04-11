@@ -71,6 +71,7 @@ BOOT_SCRIPT="$HOME/.termux/boot/start_tv_control.sh"
 cat > "$BOOT_SCRIPT" << BOOT
 #!/data/data/com.termux/files/usr/bin/bash
 # Auto-arrancado por Termux:Boot al iniciar el dispositivo
+termux-wake-lock  # Evita que Android suspenda el proceso durante la noche
 sleep 10  # Esperar a que la red esté disponible
 cd \$HOME
 python tv_control.py >> \$HOME/tv_control.log 2>&1 &
