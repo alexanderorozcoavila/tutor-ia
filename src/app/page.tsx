@@ -12,17 +12,20 @@ import { ReadingModule } from "@/components/ReadingModule";
 import { AssessmentModule } from "@/components/AssessmentModule";
 import { FullScreenWrapper } from "@/components/FullScreenWrapper";
 import { MinecraftModuleWrapper } from "@/components/MinecraftModuleWrapper";
+import { AdminModeSelector } from "@/components/AdminModeSelector";
 import { Task } from "@/lib/taskService";
 import { LogOut, Sparkles } from "lucide-react";
 
 function AppContent() {
   const { user, logout, isLoading } = useAuth();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [adminMode, setAdminMode] = useState<'selector' | 'normal' | null>(null);
 
-  // Bug fix: limpiar la tarea activa cuando cambia el usuario (logout/login)
+  // Bug fix: limpiar la tarea activa y resetear modo admin cuando cambia usuario (logout/login)
   // Sin esto, al cambiar de rol queda activa la vista del módulo anterior
   useEffect(() => {
     setActiveTask(null);
+    setAdminMode(null);
   }, [user?.id]);
 
   if (isLoading) {
@@ -92,7 +95,11 @@ function AppContent() {
     }
 
     switch (user.role) {
-      case "admin": return <AdminPanel />;
+      case "admin":
+        if (adminMode !== 'normal') {
+          return <AdminModeSelector onSelectNormal={() => setAdminMode('normal')} />;
+        }
+        return <AdminPanel />;
       case "tutor": return <TutorDashboard />;
       case "student": return <TaskDashboard onStartTask={(task) => setActiveTask(task)} />;
       default: return <div>Rol no reconocido</div>;
