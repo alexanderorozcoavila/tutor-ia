@@ -172,6 +172,8 @@ CREATE TABLE IF NOT EXISTS tv_config (
   restricted_start_time TIME,                              -- Prioridad 2: hora inicio del bloqueo
   restricted_end_time   TIME,                              -- Prioridad 2: hora fin del bloqueo
   is_active             BOOLEAN NOT NULL DEFAULT TRUE,    -- Master switch ON/OFF
+  warning_message       TEXT DEFAULT '¡Atención! La TV se apagará pronto por horario de estudio. 📚',
+  warning_minutes_before INT NOT NULL DEFAULT 5,          -- Minutos de anticipación para la alerta
   updated_at            TIMESTAMPTZ DEFAULT now(),
   updated_by            UUID REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT one_config_per_student UNIQUE (student_id)
@@ -179,3 +181,8 @@ CREATE TABLE IF NOT EXISTS tv_config (
 
 ALTER TABLE tv_config ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Permitir todo en tv_config" ON tv_config FOR ALL USING (true);
+
+-- Migración para tablas ya existentes (idempotente)
+ALTER TABLE tv_config ADD COLUMN IF NOT EXISTS warning_message TEXT DEFAULT '¡Atención! La TV se apagará pronto por horario de estudio. 📚';
+ALTER TABLE tv_config ADD COLUMN IF NOT EXISTS warning_minutes_before INT NOT NULL DEFAULT 5;
+

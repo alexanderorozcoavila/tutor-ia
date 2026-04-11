@@ -120,6 +120,8 @@ export interface TvConfig {
   restricted_start_time: string | null; // "HH:MM:SS"
   restricted_end_time: string | null;   // "HH:MM:SS"
   is_active: boolean;
+  warning_message: string;              // Texto que aparece en la TV antes del apagado
+  warning_minutes_before: number;       // Minutos de anticipación (0 = sin alerta)
   updated_at?: string;
   updated_by?: string;
 }

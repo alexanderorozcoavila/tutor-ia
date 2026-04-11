@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { getTvConfigByStudent, upsertTvConfig } from '@/actions/tvConfigActions';
 import type { TvConfig } from '@/lib/settingsService';
-import { Tv, Power, Clock, Wifi, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Tv, Power, Clock, Wifi, CheckCircle, AlertCircle, Loader2, Bell } from 'lucide-react';
 
 interface TvControlPanelProps {
   studentId: string;
@@ -17,6 +17,8 @@ const DEFAULT_CONFIG: Omit<TvConfig, 'id' | 'updated_at' | 'updated_by'> = {
   restricted_start_time: null,
   restricted_end_time: null,
   is_active: true,
+  warning_message: '¡Atención! La TV se apagará pronto por horario de estudio. 📚',
+  warning_minutes_before: 5,
 };
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -232,6 +234,56 @@ export default function TvControlPanel({ studentId, studentName }: TvControlPane
           <p className="text-xs text-gray-400 mt-2">
             Si la hora de inicio es mayor que la hora de fin, el bloqueo cruza la medianoche (ej. 22:00 → 08:00).
           </p>
+        </div>
+        {/* Alerta previa al apagado */}
+        <div className="md:col-span-2 p-4 bg-amber-50 rounded-xl border border-amber-100">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell size={15} className="text-amber-500" />
+            <p className="font-semibold text-gray-800 text-sm">Alerta previa al apagado</p>
+            {config.warning_minutes_before > 0 ? (
+              <span className="ml-auto text-xs text-amber-700 font-medium bg-amber-100 px-2 py-0.5 rounded-full">
+                {config.warning_minutes_before} min antes
+              </span>
+            ) : (
+              <span className="ml-auto text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">
+                Desactivada
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-3">
+            <div>
+              <label htmlFor={`tv-warn-min-${studentId}`} className="block text-xs text-gray-500 mb-1 font-medium">
+                Minutos de anticipación <span className="text-gray-400">(0 = sin alerta)</span>
+              </label>
+              <input
+                id={`tv-warn-min-${studentId}`}
+                type="number"
+                min={0}
+                max={30}
+                value={config.warning_minutes_before}
+                onChange={(e) => handleChange('warning_minutes_before', Number(e.target.value))}
+                className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+              />
+            </div>
+            <div>
+              <label htmlFor={`tv-warn-msg-${studentId}`} className="block text-xs text-gray-500 mb-1 font-medium">
+                Mensaje que aparece en la TV
+              </label>
+              <input
+                id={`tv-warn-msg-${studentId}`}
+                type="text"
+                value={config.warning_message}
+                onChange={(e) => handleChange('warning_message', e.target.value)}
+                maxLength={120}
+                placeholder="¡Atención! La TV se apagará pronto..."
+                className="w-full px-3 py-2 text-sm border border-amber-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Aparece como Toast en la Samsung TV {config.warning_minutes_before > 0 ? `${config.warning_minutes_before} minuto(s) antes del corte` : '(desactivado)'}.
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* IP del dispositivo */}
