@@ -60,5 +60,21 @@ export async function upsertTvConfig(
     console.error('[tvConfigActions] upsertTvConfig error:', error);
     throw new Error(error.message);
   }
+
+  // Notificar a Termux vía NTFY.sh
+  try {
+    const topic = `iatutor_tv_config_${config.student_id}`;
+    await fetch(`https://ntfy.sh/${topic}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  } catch (err) {
+    console.error('[tvConfigActions] failed to notify ntfy:', err);
+    // No interrumpimos el flujo principal si falla NTFY
+  }
+
   return data as TvConfig;
 }

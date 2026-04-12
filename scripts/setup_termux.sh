@@ -18,7 +18,7 @@ pkg install -y python python-pip
 # ── 2. Dependencias Python ─────────────────────────────────
 echo ""
 echo "🐍 Instalando librerías Python (sin compilar Rust)..."
-pip install requests samsungtvws python-dotenv
+pip install requests samsungtvws python-dotenv watchdog
 
 # ── 3. Crear archivo de variables de entorno ───────────────
 echo ""
@@ -49,19 +49,25 @@ EOF
   echo "   ⚠  EDITA el archivo y completa SUPABASE_KEY y STUDENT_ID antes de continuar."
 fi
 
-# ── 4. Copiar script al directorio home ────────────────────
+# ── 4. Copiar scripts al directorio home ───────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 SCRIPT_SRC="$SCRIPT_DIR/tv_control.py"
 SCRIPT_DEST="$HOME/tv_control.py"
-
 if [ -f "$SCRIPT_SRC" ]; then
   cp "$SCRIPT_SRC" "$SCRIPT_DEST"
-  echo ""
-  echo "📄 Script copiado a $SCRIPT_DEST"
+  echo "📄 tv_control.py copiado a $SCRIPT_DEST"
 else
-  echo ""
   echo "⚠  No se encontró tv_control.py en $SCRIPT_DIR"
-  echo "   Cópialo manualmente a $HOME/tv_control.py"
+fi
+
+NET_SCRIPT_SRC="$SCRIPT_DIR/tv_network_listener.py"
+NET_SCRIPT_DEST="$HOME/tv_network_listener.py"
+if [ -f "$NET_SCRIPT_SRC" ]; then
+  cp "$NET_SCRIPT_SRC" "$NET_SCRIPT_DEST"
+  echo "📄 tv_network_listener.py copiado a $NET_SCRIPT_DEST"
+else
+  echo "⚠  No se encontró tv_network_listener.py en $SCRIPT_DIR"
 fi
 
 # ── 5. Configurar auto-arranque con Termux:Boot ────────────
@@ -76,7 +82,8 @@ cat > "$BOOT_SCRIPT" << BOOT
 termux-wake-lock  # Evita que Android suspenda el proceso durante la noche
 sleep 10  # Esperar a que la red esté disponible
 cd \$HOME
-python tv_control.py >> \$HOME/tv_control.log 2>&1 &
+nohup python tv_network_listener.py >> \$HOME/tv_network_listener.log 2>&1 &
+nohup python tv_control.py >> \$HOME/tv_control.log 2>&1 &
 BOOT
 chmod +x "$BOOT_SCRIPT"
 echo "   ✅ Script de arranque creado: $BOOT_SCRIPT"
