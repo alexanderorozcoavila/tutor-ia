@@ -80,10 +80,12 @@ def load_local_config():
 
 class ConfigHandler(FileSystemEventHandler):
     def on_any_event(self, event):
-        # os.replace típicamente genera un FileMovedEvent (con dest_path) o FileModifiedEvent
         path = getattr(event, 'dest_path', event.src_path)
-        if path == CONFIG_PATH and not event.is_directory:
-            log.info(f"💡 Evento de sistema detectado: {event.event_type} en tv_config.json")
+        filename = os.path.basename(path)
+        
+        # Ignoramos eventos de carpetas o archivos temporales de otras cosas
+        if filename == "tv_config.json" and not event.is_directory:
+            log.info(f"💡 Evento detectado por inotify: {event.event_type} en {filename}")
             load_local_config()
 
 # ══════════════════════════════════════════════════════════════════════
@@ -194,8 +196,20 @@ def main() -> None:
     observer.schedule(event_handler, path=config_dir, recursive=False)
     observer.start()
 
+    # Variable para rastrear la última modificación del archivo
+    last_mtime = 0
+
     try:
         while True:
+            # Fallback robusto (muy barato en CPU) para Termux por si falla inotify
+            if os.path.exists(CONFIG_PATH):
+                current_mtime = os.path.getmtime(CONFIG_PATH)
+                if current_mtime > last_mtime:
+                    if last_mtime != 0:  # No loggear en la primera pasada, ya lo hace load_local_config
+                        log.info("📂 Evento detectado por polling local (respaldo de termux).")
+                        load_local_config()
+                    last_mtime = current_mtime
+
             config = global_config
 
             if config is None:
